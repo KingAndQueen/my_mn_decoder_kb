@@ -518,7 +518,7 @@ class MemN2N(object):
                         #		obj=self._cut_to_string(obj)
                         query.append('What is ' + subj + ' ' + pred)
                         if len(query) > self._sentence_size:
-                            print query
+                            print (query)
                             pdb.set_trace()
                         if obj.find(' ') >= 0:
                             answer.append(obj[:obj.index(' ')])  # output is one word for test
