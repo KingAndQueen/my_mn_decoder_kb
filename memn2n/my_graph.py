@@ -1,6 +1,4 @@
 import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
 import rdflib
 import pdb
 import gzip
