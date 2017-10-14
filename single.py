@@ -16,16 +16,16 @@ import pdb
 import math
 import nltk
 
-tf.flags.DEFINE_float("learning_rate", 0.5, "Learning rate for SGD.")
+tf.flags.DEFINE_float("learning_rate", 0.01, "Learning rate for SGD.")
 tf.flags.DEFINE_float("anneal_rate", 25, "Number of epochs between halving the learnign rate.")
 tf.flags.DEFINE_float("anneal_stop_epoch", 50, "Epoch number to end annealed lr schedule.")
 tf.flags.DEFINE_float("max_grad_norm", 80.0, "Clip gradients to this norm.")
-tf.flags.DEFINE_integer("evaluation_interval", 20, "Evaluate and print results every x epochs")
-tf.flags.DEFINE_integer("batch_size", 22, "Batch size for training.")  # should consider the size of validation set
+tf.flags.DEFINE_integer("evaluation_interval", 50, "Evaluate and print results every x epochs")
+tf.flags.DEFINE_integer("batch_size", 12, "Batch size for training.")  # should consider the size of validation set
 tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
 tf.flags.DEFINE_integer("epochs", 80, "Number of epochs to train for.")
-tf.flags.DEFINE_integer("embedding_size", 20, "Embedding size for embedding matrices.")
-tf.flags.DEFINE_integer("memory_size", 5, "Maximum size of memory.")
+tf.flags.DEFINE_integer("embedding_size", 128, "Embedding size for embedding matrices.")
+tf.flags.DEFINE_integer("memory_size", 1, "Maximum size of memory.")
 tf.flags.DEFINE_integer("additional_info_memory_size", 6, "size of additional info from KB . at least above 6")
 tf.flags.DEFINE_integer("generate_rnn_layers",3, "the num layers of RNN.")
 tf.flags.DEFINE_integer("generate_rnn_neurons", 64, "the number of neurons in one layer of RNN.")
@@ -267,7 +267,7 @@ def test_model(model, vocab):
       #  loss_batch = sequence_loss(test_pred_sents, test_sents[start:end],
                             #  testA_weight[start:end])
         loss+=test_loss
-    perplex_test=math.exp(float(loss)) #if loss<1000 else float('inf')
+    perplex_test=math.exp(float(loss)) if loss<500 else float('inf')
     print('Test sentance perplex:', perplex_test)
 
     #    test_preds = model.predict(testS, testQ,pred_type='test')

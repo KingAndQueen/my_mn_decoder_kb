@@ -148,9 +148,11 @@ class MemN2N(object):
         rnn_outputs = self.rnn_decoder(encoder_state,attention_state,a_emb,0*rnn_inputs)
         # cross entropy
         cross_entropy_list=[]
-        for logit,answer,weight in zip([rnn_outputs],[self._answers],[self._weight]):
+        sign,labels=tf.split(self._answers,[1,-1],1)
+        labels=tf.concat([labels,sign],axis=1)
+        for logit,answer_label,weight in zip([rnn_outputs],[labels],[self._weight]):
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logit,
-                                                                        labels=answer,
+                                                                        labels=answer_label,
                                                                         name="cross_entropy")
             cross_entropy_list.append( cross_entropy * weight)
         weight_sum=math_ops.add_n([self._weight])
