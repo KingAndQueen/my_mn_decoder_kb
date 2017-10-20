@@ -25,6 +25,7 @@ from tensorflow.python.util import nest
 
 from memn2n.my_seq2seq import sequence_loss, sequence_loss_by_example
 
+
 def position_encoding(sentence_size, embedding_size):
     """
     Position Encoding described in section 4.1 [1]
@@ -95,17 +96,18 @@ def get_continuous_chunks(query):
 class MemN2N(object):
     """End-To-End Memory Network."""
 
-    def __init__(self, batch_size, vocab_size,sentence_size, memory_size, embedding_size,
+    def __init__(self, batch_size, vocab_size, sentence_size, memory_size, embedding_size,
                  hops=3,
                  max_grad_norm=40.0,
                  nonlin=None,
                  encoding=position_encoding,
                  session=tf.InteractiveSession(),
-                 name='MemN2N', vocab=None, additional_info_size=0, use_lstm=False, num_layers=1, rnn_size=256,type='training'):
+                 name='MemN2N', vocab=None, additional_info_size=0, use_lstm=False, num_layers=1, rnn_size=256,
+                 type='training'):
         """Creates an End-To-End Memory Network
 
         """
-        self.type=type
+        self.type = type
         self._batch_size = batch_size
         self._vocab_size = vocab_size
         self._sentence_size = sentence_size
@@ -116,7 +118,7 @@ class MemN2N(object):
         self._nonlin = nonlin
         self._name = name
         self._rnn_size = rnn_size
-        self._num_layers=num_layers
+        self._num_layers = num_layers
         self._build_inputs()
         self._build_vars()
 
@@ -127,67 +129,68 @@ class MemN2N(object):
         self.vocab = vocab
         self.additional_info_size = additional_info_size
 
-        logits, rnn_inputs = self._inference(self._stories, self._queries)  # (batch_size, vocab_size)
+        #  logits, rnn_inputs = self._inference(self._stories, self._queries)  # (batch_size, vocab_size)
         # count the logits of inference
         #	pdb.set_trace()
-        #fact_labels = tf.slice(self._answers, [0, 0, 0], [-1, 1, -1])
-       # fact_labels = tf.squeeze(fact_labels)
-      #  cross_entropy_facts = tf.nn.softmax_cross_entropy_with_logits(logits=logits,
-      #                                                                labels=tf.cast(fact_labels, tf.float32),
-      #                                                                name='fact_cross_entropy')
-       # cross_entropy_sum_facts = tf.reduce_sum(cross_entropy_facts, name='fact_cross_entropy_sum')
+        # fact_labels = tf.slice(self._answers, [0, 0, 0], [-1, 1, -1])
+        # fact_labels = tf.squeeze(fact_labels)
+        #  cross_entropy_facts = tf.nn.softmax_cross_entropy_with_logits(logits=logits,
+        #                                                                labels=tf.cast(fact_labels, tf.float32),
+        #                                                                name='fact_cross_entropy')
+        # cross_entropy_sum_facts = tf.reduce_sum(cross_entropy_facts, name='fact_cross_entropy_sum')
 
         # decoder my docoder add a rnn in memorynetwork
         queries = tf.unstack(self._queries, axis=1)
         q_emb = [embedding_ops.embedding_lookup(self.rnn_embedding, query) for query in queries]
-        answers= tf.unstack(self._answers,axis=1)
-        a_emb = [embedding_ops.embedding_lookup(self.rnn_embedding,ans) for ans in answers]
+        answers = tf.unstack(self._answers, axis=1)
+        a_emb = [embedding_ops.embedding_lookup(self.rnn_embedding, ans) for ans in answers]
+        a_emb = a_emb[:self._sentence_size]
 
-        encoder_state,attention_state=self.rnn_encoder(q_emb,0*rnn_inputs)
+        encoder_state, attention_state = self.rnn_encoder(q_emb)
 
-        rnn_outputs = self.rnn_decoder(encoder_state,attention_state,a_emb,0*rnn_inputs)
+        rnn_outputs = self.rnn_decoder(encoder_state, attention_state, a_emb)
         # cross entropy
-        cross_entropy_list=[]
-        sign,labels=tf.split(self._answers,[1,-1],1)
-        labels=tf.concat([labels,sign],axis=1)
-        for logit,answer_label,weight in zip([rnn_outputs],[labels],[self._weight]):
-            cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=logit,
-                                                                        labels=answer_label,
-                                                                        name="cross_entropy")
-            cross_entropy_list.append( cross_entropy * weight)
-        weight_sum=math_ops.add_n([self._weight])
-        weight_sum+=1e-12
-       # cross_entropy=tf.reduce_sum(cross_entropy,axis=1)
-        log_perps=math_ops.add_n(cross_entropy_list)
+        cross_entropy_list = []
 
-        cross_entropy=log_perps/weight_sum
-        #self._batch_size
-       # cross_entropy_sum = tf.reduce_sum(cross_entropy, name="cross_entropy_sum")
+        #  sign,labels=tf.split(self._answers,[1,-1],1)
+        #  labels=tf.concat([labels,sign],axis=1)
 
-      #  loss=sequence_loss(rnn_outputs,self._answers,self._weight)
+        cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=rnn_outputs,
+                                                                           labels=self._answers_shifted,
+                                                                           name="cross_entropy")
+        cross_entropy_weighted=tf.multiply(cross_entropy, self._weight)
+
+        #weight_sum += 1e-12
+        # cross_entropy=tf.reduce_sum(cross_entropy_weighted,axis=1)
+
+        # self._batch_size
+        # cross_entropy_sum = tf.reduce_sum(cross_entropy, name="cross_entropy_sum")
+
+        #  loss=sequence_loss(rnn_outputs,self._answers,self._weight)
 
         #	pdb.set_trace()
         # loss op
-        loss_op = math_ops.reduce_sum(cross_entropy) # +1*cross_entropy_sum_facts
-        loss_op=loss_op/self._batch_size
+        loss_op = math_ops.reduce_sum(cross_entropy_weighted)  # +1*cross_entropy_sum_facts
+       # loss_op = loss_op/ self._batch_size
         # gradient pipeline
         grads_and_vars = self._opt.compute_gradients(loss_op)
         # pdb.set_trace()
-        grads_and_vars = [(tf.clip_by_norm(g, self._max_grad_norm), v) for g, v in grads_and_vars]
-        grads_and_vars = [(add_gradient_noise(g), v) for g, v in grads_and_vars]
+        #   grads_and_vars = [(tf.clip_by_norm(g, self._max_grad_norm), v) for g, v in grads_and_vars]
+        #  grads_and_vars = [(add_gradient_noise(g), v) for g, v in grads_and_vars]
 
         train_op = self._opt.apply_gradients(grads_and_vars, name="train_op")
         # predict ops
-        predict_op = rnn_outputs
+       # predict_op = rnn_outputs
         predict_proba_op = tf.nn.softmax(rnn_outputs, name="predict_proba_op")
         predict_log_proba_op = tf.log(predict_proba_op, name="predict_log_proba_op")
-      #  predict_key_fact = tf.argmax(logits, 1, name='predict_key_fact')
+        #  predict_key_fact = tf.argmax(logits, 1, name='predict_key_fact')
         # assign ops
+        self.loss_summary = tf.summary.scalar("loss", loss_op)
         self.loss_op = loss_op
-        self.predict_op = predict_op
-        self.predict_proba_op = predict_proba_op
-        self.predict_log_proba_op = predict_log_proba_op
-        self.predict_key_fact = None#predict_key_fact
+        self.predict_op = predict_proba_op
+       # self.predict_proba_op = predict_proba_op
+       # self.predict_log_proba_op = predict_log_proba_op
+        self.predict_key_fact = None  # predict_key_fact
         self.train_op = train_op
         self._sess = session
         self.saver = tf.train.Saver(tf.global_variables())
@@ -198,17 +201,16 @@ class MemN2N(object):
         with variable_scope.variable_scope('rnn_encoder'):
             single_cell = tf.nn.rnn_cell.GRUCell(self._rnn_size)
             cell = single_cell
-        #    pdb.set_trace()
+            #    pdb.set_trace()
             if self._num_layers > 1:
-                cell = tf.contrib.rnn.MultiRNNCell([single_cell for _ in range(self._num_layers)] )
+                cell = tf.contrib.rnn.MultiRNNCell([single_cell for _ in range(self._num_layers)])
             encoder_output, encoder_state = rnn.static_rnn(cell, q_emb, dtype=tf.float32)
-            top_output=[array_ops.reshape(o,[-1,1,cell.output_size] )for o in encoder_output]
-            attention_states=array_ops.concat(top_output,1)
+            top_output = [array_ops.reshape(o, [-1, 1, cell.output_size]) for o in encoder_output]
+            attention_states = array_ops.concat(top_output, 1)
 
+        return encoder_state, attention_states
 
-        return encoder_state,attention_states
-
-    def rnn_decoder(self, encoder_state,attention_states, answers, logits_MemKG=None):
+    def rnn_decoder(self, encoder_state, attention_states, answers, logits_MemKG=None):
 
         #	if (q_emb[0].get_shape()[1]-logits_MemKG.get_shape()[1])>0:
         # padding the logits to have same length of the input of decoder rnn
@@ -220,120 +222,123 @@ class MemN2N(object):
         #	if initial_state==None:
         #		batch_size=q_emb[0].get_shape().with_rank_at_least(2)[0]
         #		initial_state=cell.zero_state(batch_size,tf.float32),
-
-        num_heads=1
-        batch_size = answers[0].get_shape()[0]
-        attn_length=attention_states.get_shape()[1].value
-        attn_size=attention_states.get_shape()[2].value
-        hidden=array_ops.reshape(attention_states,[-1,attn_length,1,attn_size])
-        hidden_features=[]
-        v=[]
-        attention_vec_size=attn_size
-        for a in range(num_heads):
-            k=variable_scope.get_variable('AttnW_%d' %a,[1,1,attn_size,attention_vec_size])
-            hidden_features.append(nn_ops.conv2d(hidden,k,[1,1,1,1],'SAME'))
-            v.append(variable_scope.get_variable('AttnV_%d'%a,[attention_vec_size]))
-
-        def attention(query):
-            ds=[]
-            if nest.is_sequence(query):
-                query_list=nest.flatten(query)
-                for q in query_list:
-                    ndims=q.get_shape().ndims
-                    if ndims:
-                        assert ndims==2
-                query=array_ops.concat(query_list,1)
+        with variable_scope.variable_scope('rnn_decoder_cover'):
+            num_heads = 1
+            batch_size = answers[0].get_shape()[0]
+            attn_length = attention_states.get_shape()[1].value
+            attn_size = attention_states.get_shape()[2].value
+            hidden = array_ops.reshape(attention_states, [-1, attn_length, 1, attn_size])
+            hidden_features = []
+            v = []
+            attention_vec_size = attn_size
             for a in range(num_heads):
-                with variable_scope.variable_scope('Attention_%d'%a):
-                    y=linear(query,attention_vec_size,True)
-                    y=array_ops.reshape(y,[-1,1,1,attention_vec_size])
-                    s=math_ops.reduce_sum(v[a]*math_ops.tanh(hidden_features[a]+y),[2,3])
-                    a=nn_ops.softmax(s)
-                    d=math_ops.reduce_sum(array_ops.reshape(a,[-1,attn_length,1,1])*hidden,[1,2])
-                    ds.append(array_ops.reshape(d,[-1,attn_size]))
-            return ds
+                k = variable_scope.get_variable('AttnW_%d' % a, [1, 1, attn_size, attention_vec_size])
+                hidden_features.append(nn_ops.conv2d(hidden, k, [1, 1, 1, 1], 'SAME'))
+                v.append(variable_scope.get_variable('AttnV_%d' % a, [attention_vec_size]))
 
+            def attention(query):
+                ds = []
+                if nest.is_sequence(query):
+                    query_list = nest.flatten(query)
+                    for q in query_list:
+                        ndims = q.get_shape().ndims
+                        if ndims:
+                            assert ndims == 2
+                    query = array_ops.concat(query_list, 1)
+                for a in range(num_heads):
+                    with variable_scope.variable_scope('Attention_%d' % a):
+                        y = linear(query, attention_vec_size, True)
+                        y = array_ops.reshape(y, [-1, 1, 1, attention_vec_size])
+                        s = math_ops.reduce_sum(v[a] * math_ops.tanh(hidden_features[a] + y), [2, 3])
+                        a = nn_ops.softmax(s)
+                        d = math_ops.reduce_sum(array_ops.reshape(a, [-1, attn_length, 1, 1]) * hidden, [1, 2])
+                        ds.append(array_ops.reshape(d, [-1, attn_size]))
+                return ds
 
-        def extract_argmax_and_embed(prev, _):
-            """Loop_function that extracts the symbol from prev and embeds it."""
-            prev_symbol = array_ops.stop_gradient(math_ops.argmax(prev, 1))
-            return embedding_ops.embedding_lookup(self.rnn_embedding, prev_symbol)
+            def extract_argmax_and_embed(prev, _):
+                """Loop_function that extracts the symbol from prev and embeds it."""
+                prev_symbol = array_ops.stop_gradient(math_ops.argmax(prev, 1))
+                return embedding_ops.embedding_lookup(self.rnn_embedding, prev_symbol)
 
-        if self.type=='training':
-            loop_function = extract_argmax_and_embed
-            for i, query in enumerate(answers):  # for test the connection methods before or after the encoder
-                #q_emb[i]=tf.add(logits_MemKG, q_emb[i])
-                answers[i] = tf.concat(axis=1, values=[logits_MemKG, answers[i]])
-        else:
-            loop_function=None
-        linear = rnn_cell_impl._linear
-        batch_attn_size=array_ops.stack([batch_size,attn_size])
-        attns=[array_ops.zeros(batch_attn_size,dtype=tf.float32) for _ in range(num_heads)]
-        for a in attns:
-            a.set_shape([None,attn_size])
+            if self.type == 'testing':
+                loop_function = extract_argmax_and_embed
+            else:
+                loop_function = None
+            if logits_MemKG is not None:
+                for i, query in enumerate(answers):  # for test the connection methods before or after the encoder
+                    # q_emb[i]=tf.add(logits_MemKG, q_emb[i])
+                    answers[i] = tf.concat(axis=1, values=[logits_MemKG, answers[i]])
 
-        with variable_scope.variable_scope("rnn_decoder"):
-            single_cell_de = tf.nn.rnn_cell.GRUCell(self._rnn_size)
-            cell_de = single_cell_de
-            if self._num_layers > 1:
-                cell_de = tf.contrib.rnn.MultiRNNCell([single_cell_de] * self._num_layers)
-            outputs = []
-            prev = None
-            #   pdb.set_trace()
-            state =encoder_state
-            for i, inp in enumerate(answers):
-                if loop_function is not None and prev is not None:
-                    with variable_scope.variable_scope("loop_function", reuse=True):
-                        # We do not propagate gradients over the loop function.
-                        # qichuan use the left half embedding (fact embedding) feed to self loop
-                        #  fe=tf.split(1,2,inp)
-                        #  inp_fa=fe[1]
-                        #  inp_loop = array_ops.stop_gradient(loop_function(prev, i))
-                        #  inp=tf.concat(1,[inp_fa,inp_loop])
-                        inp = array_ops.stop_gradient(loop_function(prev, i))
-                        if logits_MemKG is not None:
-                            inp = tf.concat(axis=1, values=[logits_MemKG, inp])
-                if i > 0:
-                    variable_scope.get_variable_scope().reuse_variables()
-                inp=linear([inp]+attns,self._rnn_size,True)
-              #  inp=linear(inp,self._rnn_size,True)
-                output, state = cell_de(inp, state)
-                attns=attention(state)
-                #  pdb.set_trace()
-                with variable_scope.variable_scope('AttnOutputProjecton'):
-                    output=linear([output]+attns,self._vocab_size,True)
-                outputs.append(output)
-                if loop_function is not None:
-                    prev = array_ops.stop_gradient(output)
-                    # pdb.set_trace()
-                    #	outputs_original=copy.copy(outputs)
-        outputs = tf.transpose(outputs, perm=[1, 0, 2])
-        return outputs  # ,outputs_original
+            linear = rnn_cell_impl._linear
+            batch_attn_size = array_ops.stack([batch_size, attn_size])
+            attns = [array_ops.zeros(batch_attn_size, dtype=tf.float32) for _ in range(num_heads)]
+            for a in attns:
+                a.set_shape([None, attn_size])
+
+            with variable_scope.variable_scope("rnn_decoder"):
+                single_cell_de = tf.nn.rnn_cell.GRUCell(self._rnn_size)
+                cell_de = single_cell_de
+                if self._num_layers > 1:
+                    cell_de = tf.contrib.rnn.MultiRNNCell([single_cell_de] * self._num_layers)
+                outputs = []
+                prev = None
+                #   pdb.set_trace()
+                state = encoder_state
+                for i, inp in enumerate(answers):
+                    if loop_function is not None and prev is not None:
+                        with variable_scope.variable_scope("loop_function", reuse=True):
+                            # We do not propagate gradients over the loop function.
+                            # qichuan use the left half embedding (fact embedding) feed to self loop
+                            #  fe=tf.split(1,2,inp)
+                            #  inp_fa=fe[1]
+                            #  inp_loop = array_ops.stop_gradient(loop_function(prev, i))
+                            #  inp=tf.concat(1,[inp_fa,inp_loop])
+                            inp = array_ops.stop_gradient(loop_function(prev, i))
+                            if logits_MemKG is not None:
+                                inp = tf.concat(axis=1, values=[logits_MemKG, inp])
+                    if i > 0:
+                        variable_scope.get_variable_scope().reuse_variables()
+                    inp = linear([inp] + attns, self._rnn_size, True)
+                    #  inp=linear(inp,self._rnn_size,True)
+                    output, state = cell_de(inp, state)
+                    attns = attention(state)
+                    #  pdb.set_trace()
+                    with variable_scope.variable_scope('AttnOutputProjecton'):
+                        output = linear([output] + attns, self._vocab_size, True)
+                    outputs.append(output)
+                    if loop_function is not None:
+                        prev = array_ops.stop_gradient(output)
+                        # pdb.set_trace()
+                        #	outputs_original=copy.copy(outputs)
+            outputs = tf.transpose(outputs, perm=[1, 0, 2])
+            return outputs  # ,outputs_original
 
     def _build_inputs(self):
-        self._stories = tf.placeholder(tf.int32, [self._batch_size, self._memory_size, self._sentence_size], name="stories")
+        self._stories = tf.placeholder(tf.int32, [self._batch_size, self._memory_size, self._sentence_size],
+                                       name="stories")
         self._queries = tf.placeholder(tf.int32, [self._batch_size, self._sentence_size], name="queries")
-        self._answers = tf.placeholder(tf.int32, [self._batch_size, self._sentence_size], name="answers")
-        self._weight=tf.placeholder(tf.float32,[self._batch_size,self._sentence_size],name='A_weight')
+        self._answers = tf.placeholder(tf.int32, [self._batch_size, self._sentence_size + 1], name="answers")
+        self._weight = tf.placeholder(tf.float32, [self._batch_size, self._sentence_size], name='A_weight')
         self._lr = tf.placeholder(tf.float32, [], name="learning_rate")
+        sign, answers_shifted = tf.split(self._answers, [1, -1], 1)
+        self._answers_shifted = answers_shifted
 
     def _build_vars(self):
-        with tf.variable_scope(self._name):
-            init = tf.random_normal_initializer(stddev=0.1)
-            A = init([self._vocab_size , self._embedding_size])
-            C = init([self._vocab_size , self._embedding_size])
-            #      self.reshape_to_rnn =self._init([int(self._rnn_size), self._embedding_size])
-
-            self.A_1 = tf.Variable(A, name="A")
-
-            self.C = []
-
-            for hopn in range(self._hops):
-                with tf.variable_scope('hop_{}'.format(hopn)):
-                    self.C.append(tf.Variable(C, name="C"))
-            self.rnn_embedding = variable_scope.get_variable("embedding", [self._vocab_size, self._rnn_size],
-                                                             dtype=tf.float32)
-
+        # with tf.variable_scope(self._name):
+        #     init = tf.random_normal_initializer(stddev=0.1)
+        #     A = init([self._vocab_size , self._embedding_size])
+        #     C = init([self._vocab_size , self._embedding_size])
+        #     #      self.reshape_to_rnn =self._init([int(self._rnn_size), self._embedding_size])
+        #
+        #     self.A_1 = tf.Variable(A, name="A")
+        #
+        #     self.C = []
+        #
+        #     for hopn in range(self._hops):
+        #         with tf.variable_scope('hop_{}'.format(hopn)):
+        #             self.C.append(tf.Variable(C, name="C"))
+        self.rnn_embedding = variable_scope.get_variable("embedding", [self._vocab_size, self._rnn_size],
+                                                         dtype=tf.float32)
 
     def _inference(self, stories, queries):
         with tf.variable_scope(self._name):
@@ -630,7 +635,7 @@ class MemN2N(object):
                 #	self.reinforcement(s,q,label,a) # seems useless, you can set parameter pred_type of predict to True to get same affection
         return
 
-    def batch_fit(self, stories, queries, answers,ans_w, learning_rate, introspection=False):
+    def batch_fit(self, stories, queries, answers, ans_w, learning_rate, introspection=False):
         total_loss = 0.0
         if introspection:
             for start in range(0, len(stories), self._batch_size):
@@ -649,11 +654,12 @@ class MemN2N(object):
                 loss, _ = self._sess.run([self.loss_op, self.train_op], feed_dict=feed_dict)
                 total_loss += loss
             return total_loss
-        feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers,self._weight:ans_w, self._lr: learning_rate}
+        feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: ans_w,
+                     self._lr: learning_rate}
         loss, _ = self._sess.run([self.loss_op, self.train_op], feed_dict=feed_dict)
         return loss
 
-    def predict(self, stories, queries, answers,weight, pred_type='train', introspection=False):
+    def predict(self, stories, queries, answers, weight, pred_type='train', introspection=False):
         """Predicts answers as one-hot encoding.
 
         Args:
@@ -678,19 +684,15 @@ class MemN2N(object):
             #		new_stories=self.add_info_to_stories(stories, queries)
             #		pdb.set_trace()
             #		stories=new_stories
-            self.type='test'
-            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers,self._weight:weight}
-            return self._sess.run([self.loss_op,self.predict_op], feed_dict=feed_dict), self.vocab
+            self.type = 'test'
+            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
+            return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict), self.vocab
         if pred_type == 'train':
-            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers,self._weight:weight}
-            return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict)
+            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
+            return self._sess.run([self.loss_op, self.predict_op, self.loss_summary], feed_dict=feed_dict)
         if pred_type == 'valid':
-            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers,self._weight:weight}
+            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
             return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict)
         print('error:invalid pred_type')
 
-    def predict_proba(self, stories, queries):
-        return None
 
-    def predict_log_proba(self, stories, queries):
-        return None

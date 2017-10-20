@@ -16,25 +16,26 @@ import pdb
 import math
 import nltk
 
-tf.flags.DEFINE_float("learning_rate", 0.01, "Learning rate for SGD.")
+tf.flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for SGD.")
 tf.flags.DEFINE_float("anneal_rate", 25, "Number of epochs between halving the learnign rate.")
 tf.flags.DEFINE_float("anneal_stop_epoch", 50, "Epoch number to end annealed lr schedule.")
 tf.flags.DEFINE_float("max_grad_norm", 80.0, "Clip gradients to this norm.")
 tf.flags.DEFINE_integer("evaluation_interval", 50, "Evaluate and print results every x epochs")
-tf.flags.DEFINE_integer("batch_size", 12, "Batch size for training.")  # should consider the size of validation set
+tf.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")  # should consider the size of validation set
 tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 80, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 500, "Number of epochs to train for.")
 tf.flags.DEFINE_integer("embedding_size", 128, "Embedding size for embedding matrices.")
 tf.flags.DEFINE_integer("memory_size", 1, "Maximum size of memory.")
 tf.flags.DEFINE_integer("additional_info_memory_size", 6, "size of additional info from KB . at least above 6")
 tf.flags.DEFINE_integer("generate_rnn_layers",3, "the num layers of RNN.")
-tf.flags.DEFINE_integer("generate_rnn_neurons", 64, "the number of neurons in one layer of RNN.")
+tf.flags.DEFINE_integer("generate_rnn_neurons", 128, "the number of neurons in one layer of RNN.")
 
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 20")
 tf.flags.DEFINE_integer("random_state", None, "Random state.")
 # tf.flags.DEFINE_string("data_dir", "data/tasks_1-20_v1-2/en/", "Directory containing bAbI tasks")
 tf.flags.DEFINE_string("data_dir", "my_data/", "Directory containing bAbI tasks")
 tf.flags.DEFINE_string("checkpoint_path", "./checkpoints/", "Directory to save checkpoints")
+tf.flags.DEFINE_string("summary_path", "./summary/", "Directory to save summary")
 tf.flags.DEFINE_string("model_type", "training", "whether to load the checkpoint sor training new model")
 FLAGS = tf.flags.FLAGS
 
@@ -65,7 +66,7 @@ query_size = max(map(len, (q for _, q, _ in data)))
 answer_size = max(map(len, (a for _, _, a in data)))
 del data
 sentence_size = max(query_size, sentence_size, answer_size)  # for the position
-sentence_size += 3  # +1 for time words +1 for go +1 for eos
+sentence_size += 1  # +1 for time words +1 for go +1 for eos
 
 memory_size = min(FLAGS.memory_size, max_story_size) + FLAGS.additional_info_memory_size
 vocab=Vocab()
@@ -147,14 +148,12 @@ def count_bleu(labels_sents, predicts, vocab):
     return bleu / len(predicts)
 
 
-config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 1.0
-
-
-
+# config = tf.ConfigProto()
+# config.gpu_options.per_process_gpu_memory_fraction = 1.0
 
 def train_model(sess, model, vocab):
     print('Training...')
+    train_summary_writer = tf.summary.FileWriter(FLAGS.summary_path, sess.graph)
     for t in range(1, FLAGS.epochs + 1):
         # Stepped learning rate
         #	print ('epoch:',t)
@@ -165,79 +164,53 @@ def train_model(sess, model, vocab):
         lr = FLAGS.learning_rate / anneal
 
         np.random.shuffle(batches)
-        total_cost = 0.0
         for start, end in batches:
             s = trainS[start:end]
             q = trainQ[start:end]
             a = trainA[start:end]
             a_w = trainA_weight[start:end]
             cost_t = model.batch_fit(s, q, a,a_w, lr)
-            total_cost += cost_t
         if t % FLAGS.evaluation_interval == 0:
             # pdb.set_trace()
-            train_preds_facts = []
-            train_preds_sents = []
-            train_labels_sents = []
-            train_loss = 0.0
-            #	    print ("valid train:")
-            for start in range(0, n_train, batch_size):
-                end = start + batch_size
-                if end > n_train: continue
-                s = trainS[start:end]
-                q = trainQ[start:end]
-                a = trainA[start:end]
-                a_w=trainA_weight[start:end]
-                train_pred_loss, train_pred_sents = model.predict(s, q, a,a_w, pred_type='train')
-                #	print ("predict:",pred)
-                #   pdb.set_trace()
-             #   train_preds_facts += list(train_key_facts)
-                train_preds_sents += list(train_pred_sents)
-                train_labels_sents += list(a)
-                train_loss += train_pred_loss
-            val_preds_facts = []
-            val_preds_sents = []
+
+            train_pred_loss, train_pred_sents,summary = model.predict(s, q, a,a_w, pred_type='train')
+            train_summary_writer.add_summary(summary,t)
             val_loss = 0.0
+            sign=0
+            val_pred_sents=[]
             for start in range(0, n_val, batch_size):
+                sign += 1
                 end = start + batch_size
                 if end > n_val: continue
                 s = valS[start:end]
                 q = valQ[start:end]
                 a = valA[start:end]
                 a_w= valA_weight[start:end]
-                val_pred_loss, val_pred_sents = model.predict(s, q, a,a_w, pred_type='valid')
-               # val_preds_facts += list(val_key_facts)
-                val_preds_sents += list(val_pred_sents)
+                val_pred_loss, val_pred_sent = model.predict(s, q, a,a_w, pred_type='valid')
                 val_loss += val_pred_loss
+                val_pred_sents+=list(val_pred_sent)
                 # pdb.set_trace()
-            #train_labels_sents = np.argmax(train_labels_sents, 2)
-            # train_labels_facts=train_labels_sents[:,0]
-            # train_acc = metrics.accuracy_score(train_preds_facts, train_labels_facts)
-            # val_acc = metrics.accuracy_score(val_preds_facts, val_labels[:len(val_preds_facts)])
 
             print('-----------------------')
             print('Epoch', t)
-            print('Total Cost:', total_cost)
-            #  print('MN Training Accuracy:', train_acc)
-            #  print('MN Validation Accuracy:', val_acc)
-
+            print('valid epoches number',sign)
+            print('Training loss:',train_pred_loss)
+            print('Validation loss:',val_loss/sign)
             # show the sentence generate quality
-            #	    pdb.set_trace()
-            #perplex_train = math.exp(train_loss / float(batch_size * len(batches)))
-            perplex_train = math.exp(float(train_loss)) if train_loss < 500 else float('inf')
-            print('Training sentance perplex:', perplex_train)
-            #perplex_val = math.exp(val_loss / float(batch_size * int(n_val / batch_size)))
-            perplex_val = math.exp(float(val_loss)) if val_loss < 500 else float('inf')
-            print('Validation sentance perplex:', perplex_val)
+            #perplex_train = math.exp(float(train_pred_loss) if train_pred_loss < 500 else float('inf'))
+           # print('Training sentence perplex:', perplex_train)
+            #perplex_val = math.exp(float(val_loss/sign)) if val_loss/sign < 500 else float('inf')
+            #print('Validation sentence perplex:', perplex_val)
             # pdb.set_trace()
-            train_preds_sents_words = np.argmax(train_preds_sents, 2)
+            #train_preds_sents_words = np.argmax(train_pred_sents, 2)
             #            train_acc = metrics.accuracy_score(train_preds_sents_words[:,0], train_labels[:len(train_preds_sents_words)])
             #	    print('Training Accuracv:',train_acc)
-            bleu_score = count_bleu(trainA[:len(train_preds_sents_words)], train_preds_sents_words, vocab)
-            print('Training Bleu score:', bleu_score)
+           # bleu_score = count_bleu(a, train_preds_sents_words, vocab)
+           # print('Training Bleu score:', bleu_score)
 
-            val_preds_sents_words = np.argmax(val_preds_sents, 2)
-            bleu_score = count_bleu(valA[:len(val_preds_sents_words)], val_preds_sents_words, vocab)
-            print('Validation Bleu score:', bleu_score)
+           # val_preds_sents_words = np.argmax(val_pred_sents, 2)
+          #  bleu_score = count_bleu(valA[:len(val_preds_sents_words)], val_preds_sents_words, vocab)
+          #  print('Validation Bleu score:', bleu_score)
             print('-----------------------')
     model.saver.save(sess, FLAGS.checkpoint_path, global_step=FLAGS.epochs)
 
@@ -267,29 +240,31 @@ def test_model(model, vocab):
       #  loss_batch = sequence_loss(test_pred_sents, test_sents[start:end],
                             #  testA_weight[start:end])
         loss+=test_loss
-    perplex_test=math.exp(float(loss)) if loss<500 else float('inf')
-    print('Test sentance perplex:', perplex_test)
+    loss=loss/(len(testS)/batch_size)
+    print ('Test loss:',loss)
+   # perplex_test=math.exp(float(loss)) if loss<500 else float('inf')
+    #print('Test sentance perplex:', perplex_test)
 
     #    test_preds = model.predict(testS, testQ,pred_type='test')
     #  test_acc = metrics.accuracy_score(test_preds_facts, test_labels[:len(test_preds_facts)])
     #  print ('labels:\n',show_idx2words(test_labels,word_idx))
     #  print("MN Testing Accuracy:", test_acc)
-    test_preds_sents_words = np.argmax(test_preds_sents, 2)
-    bleu_score = count_bleu(testA[:len(test_preds_sents_words)], test_preds_sents_words, vocab)
-    print('Test Bleu score:', bleu_score)
+   # test_preds_sents_words = np.argmax(test_preds_sents, 2)
+   # bleu_score = count_bleu(testA[:len(test_preds_sents_words)], test_preds_sents_words, vocab)
+    #print('Test Bleu score:', bleu_score)
     #   test_acc = metrics.accuracy_score(test_preds_sents_words[:,0], test_labels[:len(test_preds_sents_words)])
     #   print("Testing Accuracy:", test_acc)
    # test_preds_sents = np.argmax(test_preds_sents, 2)
 
 
-    for index in range(len(test_preds_sents_words)):
-        print ('test question:',show_idx2words(testQ[index],vocab))
-       # print ('test pred facts:',show_idx2words(test_preds_facts[index],idx_word))
-        print ('test pred sents:',show_idx2words(test_preds_sents_words[index],vocab))
-        print ('test label:',show_idx2words(testA[index],vocab))
-        print ('\n')
+    # for index in range(len(test_preds_sents_words)):
+    #     print ('test question:',show_idx2words(testQ[index],vocab))
+    #    # print ('test pred facts:',show_idx2words(test_preds_facts[index],idx_word))
+    #     print ('test pred sents:',show_idx2words(test_preds_sents_words[index],vocab))
+    #     print ('test label:',show_idx2words(testA[index],vocab))
+    #     print ('\n')
 
-with tf.Session(config=config) as sess:
+with tf.Session() as sess:
     print('Initial model...')
     model = MemN2N(batch_size, vocab_size, sentence_size, memory_size, FLAGS.embedding_size, session=sess,
                    hops=FLAGS.hops, max_grad_norm=FLAGS.max_grad_norm, vocab=vocab,

@@ -231,13 +231,14 @@ def vectorize_data(data, vocab, sentence_size, memory_size):
         A_fact.append(copy.copy(y[0]))  # use the first word as fact in BAbI task
         y.append(vocab.word_to_index('<eos>'))
         weight.append(1.0)
-        la = max(0, sentence_size - len(y))
-        if la <= 0: pdb.set_trace()
+        la = max(0, sentence_size+1 - len(y))
+        if la < 0: pdb.set_trace()
         for temp in range(la):
             y.append(vocab.word_to_index('<pad>'))
             weight.append(0.0)
         #	pdb.set_trace()
         #	if len(y)!=sentence_size
+        if len(weight)>sentence_size:weight.pop()
         S.append(ss)
         Q.append(q)
         # A.append(np.array(y,'float64'))
