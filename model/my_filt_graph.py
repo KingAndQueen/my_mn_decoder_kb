@@ -1,7 +1,7 @@
 import rdflib
 import pdb
 import my_graph
-#from memn2n import get_continuous_chunks
+#from model import get_continuous_chunks
 import re
 def tokenize(sent):
 	return [x.strip() for x in re.split('(\W+)?', sent) if x.strip()]

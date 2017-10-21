@@ -6,6 +6,7 @@ import gzip
 #print list(fb.query('select distinct (count(?o) as ?count) where{<http://rdf.freebase.com/ns/m.03m8s83> <http://rdf.freebase.com/ns/type.object.key> ?o}'))
 def get_code_to_english(path):
 	f=open(path,'r')
+	#f = open(path, 'r',encoding='utf-8')
 	fbmap_code_eng={}
 	fbmap_eng_code={}
 #	file_temp=open('./wrong.txt','w')

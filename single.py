@@ -5,8 +5,8 @@ from __future__ import print_function
 from data_utils import load_task, vectorize_data, my_load_task_movies, my_load_task_tt,Vocab
 # from sklearn import cross_validation, metrics
 from sklearn import model_selection, metrics
-from memn2n import MemN2N
-#from memn2n.my_seq2seq import sequence_loss, sequence_loss_by_example
+from model.Model import Model_Mix
+#from model.my_seq2seq import sequence_loss, sequence_loss_by_example
 from itertools import chain
 from six.moves import range, reduce
 
@@ -27,8 +27,8 @@ tf.flags.DEFINE_integer("epochs", 500, "Number of epochs to train for.")
 tf.flags.DEFINE_integer("embedding_size", 128, "Embedding size for embedding matrices.")
 tf.flags.DEFINE_integer("memory_size", 1, "Maximum size of memory.")
 tf.flags.DEFINE_integer("additional_info_memory_size", 6, "size of additional info from KB . at least above 6")
-tf.flags.DEFINE_integer("generate_rnn_layers",3, "the num layers of RNN.")
-tf.flags.DEFINE_integer("generate_rnn_neurons", 128, "the number of neurons in one layer of RNN.")
+tf.flags.DEFINE_integer("rnn_layers",3, "the num layers of RNN.")
+tf.flags.DEFINE_integer("rnn_neurons", 128, "the number of neurons in one layer of RNN.")
 
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 20")
 tf.flags.DEFINE_integer("random_state", None, "Random state.")
@@ -36,7 +36,9 @@ tf.flags.DEFINE_integer("random_state", None, "Random state.")
 tf.flags.DEFINE_string("data_dir", "my_data/", "Directory containing bAbI tasks")
 tf.flags.DEFINE_string("checkpoint_path", "./checkpoints/", "Directory to save checkpoints")
 tf.flags.DEFINE_string("summary_path", "./summary/", "Directory to save summary")
-tf.flags.DEFINE_string("model_type", "training", "whether to load the checkpoint sor training new model")
+tf.flags.DEFINE_string("process_type", "test", "whether to load the checkpoint sor training new model")
+tf.flags.DEFINE_string("model_type", "seq2seq", "seq2seq or model or mix")
+
 FLAGS = tf.flags.FLAGS
 
 print("Started Task:", FLAGS.task_id)
@@ -106,13 +108,6 @@ print("Training Size", n_train)
 print("Validation Size", n_val)
 print("Testing Size", n_test)
 
-# train_labels = np.argmax(trainA_fact, axis=1)
-# train_sents = np.argmax(trainA, axis=2)
-# test_labels = np.argmax(testA_fact, axis=1)
-# test_sents = np.argmax(testA, axis=2)
-# val_labels = np.argmax(valA_fact, axis=1)
-# val_sents = np.argmax(valA, axis=2)
-
 tf.set_random_seed(FLAGS.random_state)
 batch_size = FLAGS.batch_size
 
@@ -120,18 +115,17 @@ batches = zip(range(0, n_train - batch_size, batch_size), range(batch_size, n_tr
 batches = [(start, end) for start, end in batches]
 
 
-def show_idx2words(seq, vocab):
-    #    idx_word={k:v for v,k in word_idx.iteritems()}
+def show_result(seq, vocab):
     words = []
-    #    pdb.set_trace()
     if isinstance(seq, (list, np.ndarray)):
         for idx in seq:
-            words.append(vocab.index_to_word(idx))
-            if vocab.index_to_word(idx) == 'EOS':
-                return words
-        return words
+            if isinstance(idx,(list,np.ndarray)):
+                show_result(idx,vocab)
+            else:
+                words.append(vocab.index_to_word(idx))
+        print (words)
     if isinstance(seq, (str, int)):
-        return vocab.index_to_word(seq)
+        print (vocab.idx_to_word(seq))
 
 
 def count_bleu(labels_sents, predicts, vocab):
@@ -169,11 +163,9 @@ def train_model(sess, model, vocab):
             q = trainQ[start:end]
             a = trainA[start:end]
             a_w = trainA_weight[start:end]
-            cost_t = model.batch_fit(s, q, a,a_w, lr)
+            train_pred_loss, _, summary = model.predict(s, q, a,a_w,process_type='train',lr=lr)
         if t % FLAGS.evaluation_interval == 0:
             # pdb.set_trace()
-
-            train_pred_loss, train_pred_sents,summary = model.predict(s, q, a,a_w, pred_type='train')
             train_summary_writer.add_summary(summary,t)
             val_loss = 0.0
             sign=0
@@ -186,7 +178,7 @@ def train_model(sess, model, vocab):
                 q = valQ[start:end]
                 a = valA[start:end]
                 a_w= valA_weight[start:end]
-                val_pred_loss, val_pred_sent = model.predict(s, q, a,a_w, pred_type='valid')
+                val_pred_loss, val_pred_sent = model.predict(s, q, a,a_w, process_type='valid')
                 val_loss += val_pred_loss
                 val_pred_sents+=list(val_pred_sent)
                 # pdb.set_trace()
@@ -232,46 +224,32 @@ def test_model(model, vocab):
         q = testQ[start:end]
         a=testA[start:end]
         a_w=trainA_weight[start:end]
-        test_result, word_idx_new = model.predict(s, q, a, a_w,pred_type='test')
+        test_result, vocab_new = model.predict(s, q, a, a_w,process_type='test')
         test_loss,test_pred_sents = test_result
       #  test_preds_facts += list(test_pred_facts)
         test_preds_sents += list(test_pred_sents)
-    #    pdb.set_trace()
-      #  loss_batch = sequence_loss(test_pred_sents, test_sents[start:end],
-                            #  testA_weight[start:end])
         loss+=test_loss
     loss=loss/(len(testS)/batch_size)
     print ('Test loss:',loss)
    # perplex_test=math.exp(float(loss)) if loss<500 else float('inf')
     #print('Test sentance perplex:', perplex_test)
 
-    #    test_preds = model.predict(testS, testQ,pred_type='test')
     #  test_acc = metrics.accuracy_score(test_preds_facts, test_labels[:len(test_preds_facts)])
     #  print ('labels:\n',show_idx2words(test_labels,word_idx))
     #  print("MN Testing Accuracy:", test_acc)
-   # test_preds_sents_words = np.argmax(test_preds_sents, 2)
+    test_preds_sents_words = np.argmax(test_preds_sents, 2)
    # bleu_score = count_bleu(testA[:len(test_preds_sents_words)], test_preds_sents_words, vocab)
     #print('Test Bleu score:', bleu_score)
     #   test_acc = metrics.accuracy_score(test_preds_sents_words[:,0], test_labels[:len(test_preds_sents_words)])
     #   print("Testing Accuracy:", test_acc)
-   # test_preds_sents = np.argmax(test_preds_sents, 2)
+    show_result(test_preds_sents_words,vocab_new)
 
-
-    # for index in range(len(test_preds_sents_words)):
-    #     print ('test question:',show_idx2words(testQ[index],vocab))
-    #    # print ('test pred facts:',show_idx2words(test_preds_facts[index],idx_word))
-    #     print ('test pred sents:',show_idx2words(test_preds_sents_words[index],vocab))
-    #     print ('test label:',show_idx2words(testA[index],vocab))
-    #     print ('\n')
 
 with tf.Session() as sess:
     print('Initial model...')
-    model = MemN2N(batch_size, vocab_size, sentence_size, memory_size, FLAGS.embedding_size, session=sess,
-                   hops=FLAGS.hops, max_grad_norm=FLAGS.max_grad_norm, vocab=vocab,
-                   additional_info_size=FLAGS.additional_info_memory_size,
-                   num_layers=FLAGS.generate_rnn_layers, rnn_size=FLAGS.generate_rnn_neurons)
+    model = Model_Mix(vocab_size, sentence_size, memory_size,FLAGS, session=sess,vocab=vocab)
 
-    if FLAGS.model_type == 'training':
+    if FLAGS.process_type == 'training':
         print('Initial model with fresh parameters.')
         sess.run(tf.global_variables_initializer())
         train_model(sess, model, vocab)
