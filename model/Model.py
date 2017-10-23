@@ -109,11 +109,13 @@ class Model_Mix(object):
         self._num_layers = FLAGS.rnn_layers
         self._build_inputs()
         self._build_vars()
-        self._opt = tf.train.GradientDescentOptimizer(learning_rate=self._lr)
         self._encoding = tf.constant(encoding(self._sentence_size, self._embedding_size), name="encoding")
         self.vocab = vocab
         self.additional_info_size = FLAGS.additional_info_memory_size
-        logits_mem = None
+        self._lr=tf.Variable(float(FLAGS.learning_rate), trainable=False, dtype=tf.float32)
+        self.learning_rate_decay_op = tf.assign(self._lr,self._lr * FLAGS.learning_rate_decay_factor)
+        self._opt = tf.train.GradientDescentOptimizer(learning_rate=self._lr)
+        # logits_mem = None
         if FLAGS.model_type == 'memn2n' or FLAGS.model_type == 'mix':
             logits, logits_mem = self._inference(self._stories, self._queries)  # (batch_size, vocab_size)
             # count the logits of inference
@@ -289,7 +291,7 @@ class Model_Mix(object):
         self._queries = tf.placeholder(tf.int32, [self._batch_size, self._sentence_size], name="queries")
         self._answers = tf.placeholder(tf.int32, [self._batch_size, self._sentence_size + 1], name="answers")
         self._weight = tf.placeholder(tf.float32, [self._batch_size, self._sentence_size], name='A_weight')
-        self._lr = tf.placeholder(tf.float32, [], name="learning_rate")
+        # self._lr = tf.placeholder(tf.float32, [], name="learning_rate")
         sign, answers_shifted = tf.split(self._answers, [1, -1], 1)
         self._answers_shifted = answers_shifted
 
@@ -641,8 +643,7 @@ class Model_Mix(object):
             feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
             return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict), self.vocab
         if process_type == 'train':
-            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight,
-                         self._lr: lr}
+            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
             return self._sess.run([self.loss_op, self.train_op, self.loss_summary], feed_dict=feed_dict)
         if process_type == 'valid':
             feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
