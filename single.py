@@ -16,19 +16,20 @@ import pdb
 import math
 import nltk
 
-tf.flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for SGD.")
-tf.flags.DEFINE_float("anneal_rate", 25, "Number of epochs between halving the learnign rate.")
-tf.flags.DEFINE_float("anneal_stop_epoch", 50, "Epoch number to end annealed lr schedule.")
+tf.flags.DEFINE_float("learning_rate", 0.5, "Learning rate for SGD.")
+# tf.flags.DEFINE_float("anneal_rate", 25, "Number of epochs between halving the learnign rate.")
+# tf.flags.DEFINE_float("anneal_stop_epoch", 50, "Epoch number to end annealed lr schedule.")
+tf.flags.DEFINE_float("learning_rate_decay_factor", 0.99,'if loss not decrease, multiple the lr with factor')
 tf.flags.DEFINE_float("max_grad_norm", 80.0, "Clip gradients to this norm.")
 tf.flags.DEFINE_integer("evaluation_interval", 50, "Evaluate and print results every x epochs")
 tf.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")  # should consider the size of validation set
 tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
 tf.flags.DEFINE_integer("epochs", 500, "Number of epochs to train for.")
-tf.flags.DEFINE_integer("embedding_size", 128, "Embedding size for embedding matrices.")
+tf.flags.DEFINE_integer("embedding_size", 128, "Embedding size for MemE2E embedding matrices.")
 tf.flags.DEFINE_integer("memory_size", 1, "Maximum size of memory.")
 tf.flags.DEFINE_integer("additional_info_memory_size", 6, "size of additional info from KB . at least above 6")
 tf.flags.DEFINE_integer("rnn_layers",3, "the num layers of RNN.")
-tf.flags.DEFINE_integer("rnn_neurons", 128, "the number of neurons in one layer of RNN.")
+tf.flags.DEFINE_integer("rnn_neurons", 128, "the number of neurons in Seq2seq's one layer of RNN.")
 
 tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 20")
 tf.flags.DEFINE_integer("random_state", None, "Random state.")
@@ -36,7 +37,7 @@ tf.flags.DEFINE_integer("random_state", None, "Random state.")
 tf.flags.DEFINE_string("data_dir", "my_data/", "Directory containing bAbI tasks")
 tf.flags.DEFINE_string("checkpoint_path", "./checkpoints/", "Directory to save checkpoints")
 tf.flags.DEFINE_string("summary_path", "./summary/", "Directory to save summary")
-tf.flags.DEFINE_string("process_type", "test", "whether to load the checkpoint sor training new model")
+tf.flags.DEFINE_string("process_type", "train", "whether to load the checkpoint sor training new model")
 tf.flags.DEFINE_string("model_type", "seq2seq", "seq2seq or model or mix")
 
 FLAGS = tf.flags.FLAGS
@@ -149,23 +150,26 @@ def train_model(sess, model, vocab):
     print('Training...')
     train_summary_writer = tf.summary.FileWriter(FLAGS.summary_path, sess.graph)
     for t in range(1, FLAGS.epochs + 1):
-        # Stepped learning rate
-        #	print ('epoch:',t)
-        if t - 1 <= FLAGS.anneal_stop_epoch:
-            anneal = 2.0 ** ((t - 1) // FLAGS.anneal_rate)
-        else:
-            anneal = 2.0 ** (FLAGS.anneal_stop_epoch // FLAGS.anneal_rate)
-        lr = FLAGS.learning_rate / anneal
+        # Stepped learning rate, decay 1/2 every time
+        # if t - 1 <= FLAGS.anneal_stop_epoch:
+        #     anneal = 2.0 ** ((t - 1) // FLAGS.anneal_rate)
+        # else:
+        #     anneal = 2.0 ** (FLAGS.anneal_stop_epoch // FLAGS.anneal_rate)
+        # lr = FLAGS.learning_rate / anneal
 
         np.random.shuffle(batches)
+        previous_losses=[]
         for start, end in batches:
             s = trainS[start:end]
             q = trainQ[start:end]
             a = trainA[start:end]
             a_w = trainA_weight[start:end]
-            train_pred_loss, _, summary = model.predict(s, q, a,a_w,process_type='train',lr=lr)
+            train_pred_loss, _, summary = model.predict(s, q, a,a_w,process_type='train')
+            previous_losses.append(train_pred_loss)
         if t % FLAGS.evaluation_interval == 0:
             # pdb.set_trace()
+            if len(previous_losses) > 2 and train_pred_loss > max(previous_losses[-3:]):
+                sess.run(model.learning_rate_decay_op)
             train_summary_writer.add_summary(summary,t)
             val_loss = 0.0
             sign=0
@@ -249,7 +253,7 @@ with tf.Session() as sess:
     print('Initial model...')
     model = Model_Mix(vocab_size, sentence_size, memory_size,FLAGS, session=sess,vocab=vocab)
 
-    if FLAGS.process_type == 'training':
+    if FLAGS.process_type == 'train':
         print('Initial model with fresh parameters.')
         sess.run(tf.global_variables_initializer())
         train_model(sess, model, vocab)
