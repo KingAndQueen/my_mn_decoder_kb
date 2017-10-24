@@ -156,8 +156,8 @@ class Model_Mix(object):
 
         grads_and_vars = self._opt.compute_gradients(loss_op)
         # pdb.set_trace()
-        #  grads_and_vars = [(tf.clip_by_norm(g, self._max_grad_norm), v) for g, v in grads_and_vars]
-        #  grads_and_vars = [(add_gradient_noise(g), v) for g, v in grads_and_vars]
+        grads_and_vars = [(tf.clip_by_norm(g, self._max_grad_norm), v) for g, v in grads_and_vars]
+        grads_and_vars = [(add_gradient_noise(g), v) for g, v in grads_and_vars]
 
         train_op = self._opt.apply_gradients(grads_and_vars, name="train_op")
         tf.summary.scalar("loss", loss_op)

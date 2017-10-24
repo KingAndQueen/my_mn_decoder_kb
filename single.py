@@ -16,15 +16,15 @@ import pdb
 import math
 import nltk
 
-tf.flags.DEFINE_float("learning_rate", 0.5, "Learning rate for SGD.")
+tf.flags.DEFINE_float("learning_rate", 0.1, "Learning rate for SGD.")
 # tf.flags.DEFINE_float("anneal_rate", 25, "Number of epochs between halving the learnign rate.")
 # tf.flags.DEFINE_float("anneal_stop_epoch", 50, "Epoch number to end annealed lr schedule.")
-tf.flags.DEFINE_float("learning_rate_decay_factor", 0.99,'if loss not decrease, multiple the lr with factor')
-tf.flags.DEFINE_float("max_grad_norm", 80.0, "Clip gradients to this norm.")
-tf.flags.DEFINE_integer("evaluation_interval", 50, "Evaluate and print results every x epochs")
+tf.flags.DEFINE_float("learning_rate_decay_factor", 0.6,'if loss not decrease, multiple the lr with factor')
+tf.flags.DEFINE_float("max_grad_norm", 8.0, "Clip gradients to this norm.")
+tf.flags.DEFINE_integer("evaluation_interval", 20, "Evaluate and print results every x epochs")
 tf.flags.DEFINE_integer("batch_size", 16, "Batch size for training.")  # should consider the size of validation set
 tf.flags.DEFINE_integer("hops", 1, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 500, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 50, "Number of epochs to train for.")
 tf.flags.DEFINE_integer("embedding_size", 128, "Embedding size for MemE2E embedding matrices.")
 tf.flags.DEFINE_integer("memory_size", 1, "Maximum size of memory.")
 tf.flags.DEFINE_integer("additional_info_memory_size", 6, "size of additional info from KB . at least above 6")
@@ -123,6 +123,7 @@ def show_result(seq, vocab):
             if isinstance(idx,(list,np.ndarray)):
                 show_result(idx,vocab)
             else:
+                if vocab.index_to_word(idx)=='<eos>': break
                 words.append(vocab.index_to_word(idx))
         print (words)
     if isinstance(seq, (str, int)):
