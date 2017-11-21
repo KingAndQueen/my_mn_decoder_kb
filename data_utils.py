@@ -36,14 +36,41 @@ class Vocab():
     def vocab_size(self):
         return len(self.idx2word)
 
+def my_get_friends(data_dir, data_type, filter_sents_len):
+    data_base=[]
+    data_dir = data_dir + '/' + data_type
+    f=open(data_dir,'r')
+    last_sents=[]
+    s,q,a=[],[],[]
+    for lines in f:
+        if len(lines)>2:
+            sents=lines[lines.index(':')+1:]
+            s.append(sents)
+            if len(last_sents)==0:
+                last_sents=sents
+                continue
+            q=last_sents
+            a=sents
+            last_sents=sents
+        else:
+            data_base.append((s,q,a))
+            s=[]
+            q=[]
+            a=[]
 
+    return data_base
+
+def my_load_friends(data_dir,fileter_sents_len):
+    train_data=my_get_friends(data_dir,'Train',fileter_sents_len)
+    test_data=my_get_friends(data_dir,'Test',fileter_sents_len)
+
+    return train_data, test_data
 def my_load_task_tt(data_dir, filter_sents_len):
     train_data = my_get_tt(data_dir, 'train', filter_sents_len)
     test_data = my_get_tt(data_dir, 'test', filter_sents_len)
     #    database = load_json.LoadData([data_dir])
     #  pdb.set_trace()
     return train_data, test_data
-
 
 #    with open('word2vec/test_complete.pkl','w') as f:
 #	pickle.dump(database,f)
