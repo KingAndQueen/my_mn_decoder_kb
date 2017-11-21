@@ -2,7 +2,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-from data_utils import load_task, vectorize_data, my_load_task_movies, my_load_task_tt,Vocab
+from data_utils import load_task, vectorize_data, my_load_task_movies, my_load_task_tt,Vocab,my_load_friends
 # from sklearn import cross_validation, metrics
 from sklearn import model_selection, metrics
 from model.Model import Model_Mix
@@ -51,9 +51,10 @@ test = []
 # train_sqa_movie,test_sqa_movie=my_load_task_movies(FLAGS.data_dir,20)
 # train.extend(train_sqa_movie)
 # test.extend(test_sqa_movie)
-train_sqa_tt, test_sqa_tt = my_load_task_tt(FLAGS.data_dir + 'ticktock_data_small', 20)
-train.extend(train_sqa_tt)
-test.extend(test_sqa_tt)
+# train_sqa_tt, test_sqa_tt = my_load_task_tt(FLAGS.data_dir + 'ticktock_data_small', 20)
+train_sqa_friends,text_sqa_friends=my_load_friends(FLAGS.data_dir+'friends',20)
+train.extend(train_sqa_friends)
+test.extend(text_sqa_friends)
 # pdb.set_trace()
 data = train + test
 # train,test=model_selection.train_test_split(data,test_size=0.2,random_state=FLAGS.random_state)
