@@ -58,7 +58,7 @@ def my_get_friends(data_dir, data_type, filter_sents_len):
             q=[]
             a=[]
             last_sents=[]
-    pdb.set_trace()
+    # pdb.set_trace()
     return data_base
 
 def my_load_friends(data_dir,fileter_sents_len):
