@@ -51,7 +51,7 @@ test = []
 # train_sqa_movie,test_sqa_movie=my_load_task_movies(FLAGS.data_dir,20)
 # train.extend(train_sqa_movie)
 # test.extend(test_sqa_movie)
-# train_sqa_tt, test_sqa_tt = my_load_task_tt(FLAGS.data_dir + 'ticktock_data_small', 20)
+train_sqa_tt, test_sqa_tt = my_load_task_tt(FLAGS.data_dir + 'ticktock_data_small', 20)
 train_sqa_friends,text_sqa_friends=my_load_friends(FLAGS.data_dir+'friends',20)
 train.extend(train_sqa_friends)
 test.extend(text_sqa_friends)

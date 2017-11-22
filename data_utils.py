@@ -45,24 +45,25 @@ def my_get_friends(data_dir, data_type, filter_sents_len):
     for lines in f:
         if len(lines)>2:
             sents=lines[lines.index(':')+1:]
-            s.append(sents)
             if len(last_sents)==0:
                 last_sents=sents
                 continue
-            q=last_sents
-            a=sents
+            q=tokenize(last_sents.strip())
+            a=tokenize(sents.strip())
+            s.append(q)
             last_sents=sents
         else:
             data_base.append((s,q,a))
             s=[]
             q=[]
             a=[]
-
+            last_sents=[]
+    pdb.set_trace()
     return data_base
 
 def my_load_friends(data_dir,fileter_sents_len):
-    train_data=my_get_friends(data_dir,'Train',fileter_sents_len)
-    test_data=my_get_friends(data_dir,'Test',fileter_sents_len)
+    train_data=my_get_friends(data_dir,'Train.txt',fileter_sents_len)
+    test_data=my_get_friends(data_dir,'Test.txt',fileter_sents_len)
 
     return train_data, test_data
 def my_load_task_tt(data_dir, filter_sents_len):
@@ -102,6 +103,7 @@ def my_load_data_tt(filelist, filter_sents_len):
             s.append(q)
             if len(q) < filter_sents_len and len(a) < filter_sents_len:
                 database.append((s, q, a))
+
     return database
 
 
