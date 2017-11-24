@@ -45,7 +45,7 @@ def my_get_friends(data_dir, data_type, filter_sents_len):
     s,q,a=[],[],[]
     for lines in f:
         lines = lines.strip()[2:-5]
-        pdb.set_trace()
+        # pdb.set_trace()
         lines=lines.split()[:filter_sents_len]
         temp=' '
         lines=temp.join(lines)
