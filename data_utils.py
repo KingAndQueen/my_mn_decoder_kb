@@ -40,9 +40,15 @@ def my_get_friends(data_dir, data_type, filter_sents_len):
     data_base=[]
     data_dir = data_dir + '/' + data_type
     f=open(data_dir,'r')
+    # f = open(data_dir, 'r',encoding = 'utf-8')
     last_sents=[]
     s,q,a=[],[],[]
     for lines in f:
+        lines = lines.strip()[2:-5]
+        pdb.set_trace()
+        lines=lines.split()[:filter_sents_len]
+        temp=' '
+        lines=temp.join(lines)
         if len(lines)>2:
             sents=lines[lines.index(':')+1:]
             if len(last_sents)==0:
