@@ -68,9 +68,9 @@ def my_get_friends(data_dir, data_type, filter_sents_len):
     return data_base
 
 def my_load_friends(data_dir,fileter_sents_len):
-    train_data=my_get_friends(data_dir,'Train.txt',fileter_sents_len)
-    test_data=my_get_friends(data_dir,'Test.txt',fileter_sents_len)
-    valid_data = my_get_friends(data_dir, 'Validation.txt', fileter_sents_len)
+    train_data=my_get_friends(data_dir,'train.txt',fileter_sents_len)
+    test_data=my_get_friends(data_dir,'test.txt',fileter_sents_len)
+    valid_data = my_get_friends(data_dir, 'validation.txt', fileter_sents_len)
     train_data+=valid_data
     return train_data, test_data
 def my_load_task_tt(data_dir, filter_sents_len):
