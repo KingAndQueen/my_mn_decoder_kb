@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import print_function
-
 from data_utils import load_task, vectorize_data, my_load_task_movies, my_load_task_tt, Vocab, my_load_friends
 # from sklearn import cross_validation, metrics
 from sklearn import model_selection, metrics

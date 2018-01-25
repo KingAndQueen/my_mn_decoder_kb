@@ -140,16 +140,17 @@ class Model_Mix(object):
             encoder_state, attention_state = self.rnn_encoder(q_emb)
             rnn_outputs = self.rnn_decoder(encoder_state, attention_state, a_emb, logits_MemKG=logits_mem)
             # cross entropy
+            predict_proba_op = tf.nn.softmax(rnn_outputs, name="predict_proba_op")
+            self.predict_op = predict_proba_op
 
             cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=rnn_outputs,
                                                                            labels=self._answers_shifted,
                                                                            name="cross_entropy")
             cross_entropy_weighted = tf.multiply(cross_entropy, self._weight)
             cross_entropy_weighted_sum = math_ops.reduce_sum(cross_entropy_weighted)
-            predict_proba_op = tf.nn.softmax(rnn_outputs, name="predict_proba_op")
-            self.predict_op = predict_proba_op
-            loss_op = cross_entropy_weighted_sum
-
+            weight_sum = tf.reduce_sum(self._weight, axis=1)
+            loss_op = cross_entropy_weighted_sum/weight_sum
+            # pdb.set_trace()
         if FLAGS.model_type == 'mix':
             loss_op = cross_entropy_facts_sum + cross_entropy_weighted_sum
 
@@ -232,7 +233,7 @@ class Model_Mix(object):
                 prev_symbol = array_ops.stop_gradient(math_ops.argmax(prev, 1))
                 return embedding_ops.embedding_lookup(self.rnn_embedding, prev_symbol)
 
-            if self.process_type == 'testing':
+            if self.process_type == 'test':
                 loop_function = extract_argmax_and_embed
             else:
                 loop_function = None
