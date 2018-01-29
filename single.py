@@ -86,7 +86,9 @@ print("Average story length", mean_story_size)
 print('Memory size', memory_size)
 # train/validation/test sets
 # pdb.set_trace()
-
+FLAGS.vocab_size=vocab_size
+FLAGS.sentence_size=sentence_size
+FLAGS.memory_size=memory_size
 del train
 trainS, valS, trainQ, valQ, trainA, valA, trainA_fact, valA_fact, trainA_weight, valA_weight = model_selection.train_test_split(
     S, Q, A, A_fact, A_weight, test_size=.2,
@@ -208,9 +210,6 @@ def train_model(sess, model, vocab):
             print('-----------------------')
     model.saver.save(sess, FLAGS.checkpoint_path, global_step=FLAGS.epochs)
 
-    # test_model(model,testS,testQ,test_labels,batch_size)
-    test_model(model, vocab)
-
 
 def test_model(model, vocab):
     # def test_model(model,testS,testQ,test_labels,batch_size):
@@ -249,14 +248,18 @@ def test_model(model, vocab):
 
 
 with tf.Session() as sess:
-    print('Initial model...')
-    model = Model_Mix(vocab_size, sentence_size, memory_size, FLAGS, session=sess, vocab=vocab)
 
     if FLAGS.process_type == 'train':
+        print('Initial model...')
+        model = Model_Mix(FLAGS, session=sess, vocab=vocab)
         print('Initial model with fresh parameters.')
         sess.run(tf.global_variables_initializer())
         train_model(sess, model, vocab)
-    else:
+        del  model
+    if FLAGS.process_type =='test'or FLAGS.process_type=='train':
+        print('Initial model...')
+        FLAGS.process_type='test'
+        model = Model_Mix(FLAGS, session=sess, vocab=vocab)
         print('Reading model parameters from checkpoints %s', FLAGS.checkpoint_path)
         ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_path)
         model.saver.restore(sess, ckpt.model_checkpoint_path)

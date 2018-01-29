@@ -89,7 +89,7 @@ def get_continuous_chunks(query):
 class Model_Mix(object):
     """End-To-End Memory Network."""
 
-    def __init__(self, vocab_size, sentence_size, memory_size, FLAGS,
+    def __init__(self, FLAGS,
                  encoding=position_encoding,
                  session=tf.InteractiveSession(),
                  vocab=None, ):
@@ -98,9 +98,9 @@ class Model_Mix(object):
         self._sess = session
         self.process_type = FLAGS.process_type
         self._batch_size = FLAGS.batch_size
-        self._vocab_size = vocab_size
-        self._sentence_size = sentence_size
-        self._memory_size = memory_size
+        self._vocab_size = FLAGS.vocab_size
+        self._sentence_size = FLAGS.sentence_size
+        self._memory_size = FLAGS.memory_size
         self._embedding_size = FLAGS.embedding_size
         self._hops = FLAGS.hops
         self._max_grad_norm = FLAGS.max_grad_norm
@@ -154,13 +154,14 @@ class Model_Mix(object):
         if FLAGS.model_type == 'mix':
             loss_op = cross_entropy_facts_sum + cross_entropy_weighted_sum
 
-
+        loss_op=tf.reduce_mean(loss_op, name="cross_entropy_sum")
         grads_and_vars = self._opt.compute_gradients(loss_op)
         # pdb.set_trace()
         grads_and_vars = [(tf.clip_by_norm(g, self._max_grad_norm), v) for g, v in grads_and_vars]
         grads_and_vars = [(add_gradient_noise(g), v) for g, v in grads_and_vars]
 
         train_op = self._opt.apply_gradients(grads_and_vars, name="train_op")
+        # pdb.set_trace()
         tf.summary.scalar("loss", loss_op)
         # assign ops
         self.loss_op=loss_op
