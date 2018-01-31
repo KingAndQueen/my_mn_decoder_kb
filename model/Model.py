@@ -15,7 +15,7 @@ import re
 from tensorflow.python.ops import rnn_cell
 from tensorflow.python.ops import rnn
 from tensorflow.python.ops import nn_ops
-from tensorflow.python.ops import variable_scope
+#from tensorflow.python.ops import variable_scope
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import embedding_ops
@@ -172,7 +172,7 @@ class Model_Mix(object):
         self._fb_map = my_graph.get_code_to_english('./useful_Map.txt')
 
     def rnn_encoder(self, q_emb):
-        with variable_scope.variable_scope('rnn_encoder'):
+        with tf.variable_scope('rnn_encoder'):
             single_cell = tf.nn.rnn_cell.GRUCell(self._rnn_neurons)
             cell = single_cell
             #    pdb.set_trace()
@@ -196,7 +196,7 @@ class Model_Mix(object):
         #	if initial_state==None:
         #		batch_size=q_emb[0].get_shape().with_rank_at_least(2)[0]
         #		initial_state=cell.zero_state(batch_size,tf.float32),
-        with variable_scope.variable_scope('rnn_decoder_cover'):
+        with tf.variable_scope('rnn_decoder_cover'):
             num_heads = 1
             batch_size = answers[0].get_shape()[0]
             attn_length = attention_states.get_shape()[1].value
@@ -206,9 +206,9 @@ class Model_Mix(object):
             v = []
             attention_vec_size = attn_size
             for a in range(num_heads):
-                k = variable_scope.get_variable('AttnW_%d' % a, [1, 1, attn_size, attention_vec_size])
+                k = tf.get_variable('AttnW_%d' % a, [1, 1, attn_size, attention_vec_size])
                 hidden_features.append(nn_ops.conv2d(hidden, k, [1, 1, 1, 1], 'SAME'))
-                v.append(variable_scope.get_variable('AttnV_%d' % a, [attention_vec_size]))
+                v.append(tf.get_variable('AttnV_%d' % a, [attention_vec_size]))
 
             def attention(query):
                 ds = []
@@ -220,7 +220,7 @@ class Model_Mix(object):
                             assert ndims == 2
                     query = array_ops.concat(query_list, 1)
                 for a in range(num_heads):
-                    with variable_scope.variable_scope('Attention_%d' % a):
+                    with tf.variable_scope('Attention_%d' % a):
                         y = linear(query, attention_vec_size, True)
                         y = array_ops.reshape(y, [-1, 1, 1, attention_vec_size])
                         s = math_ops.reduce_sum(v[a] * math_ops.tanh(hidden_features[a] + y), [2, 3])
@@ -249,7 +249,7 @@ class Model_Mix(object):
             for a in attns:
                 a.set_shape([None, attn_size])
 
-            with variable_scope.variable_scope("rnn_decoder"):
+            with tf.variable_scope("rnn_decoder"):
                 single_cell_de = tf.nn.rnn_cell.GRUCell(self._rnn_neurons)
                 cell_de = single_cell_de
                 if self._num_layers > 1:
@@ -260,7 +260,7 @@ class Model_Mix(object):
                 state = encoder_state
                 for i, inp in enumerate(answers):
                     if loop_function is not None and prev is not None:
-                        with variable_scope.variable_scope("loop_function", reuse=True):
+                        with tf.variable_scope("loop_function", reuse=True):
                             # We do not propagate gradients over the loop function.
                             # qichuan use the left half embedding (fact embedding) feed to self loop
                             #  fe=tf.split(1,2,inp)
@@ -271,13 +271,13 @@ class Model_Mix(object):
                             if logits_MemKG is not None:
                                 inp = tf.concat(axis=1, values=[logits_MemKG, inp])
                     if i > 0:
-                        variable_scope.get_variable_scope().reuse_variables()
+                        tf.get_variable_scope().reuse_variables()
                     inp = linear([inp] + attns, self._rnn_neurons, True)
                     #  inp=linear(inp,self._rnn_neurons,True)
                     output, state = cell_de(inp, state)
                     attns = attention(state)
                     #  pdb.set_trace()
-                    with variable_scope.variable_scope('AttnOutputProjecton'):
+                    with tf.variable_scope('AttnOutputProjecton'):
                         output = linear([output] + attns, self._vocab_size, True)
                     outputs.append(output)
                     if loop_function is not None:
