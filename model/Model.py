@@ -8,7 +8,7 @@ import numpy as np
 from six.moves import range
 from nltk import ne_chunk, pos_tag, word_tokenize
 from nltk.tree import Tree
-import model.my_graph as my_graph
+# import model.my_graph as my_graph
 import pdb
 import re
 
@@ -23,7 +23,7 @@ from tensorflow.contrib.rnn.python.ops import core_rnn_cell
 from tensorflow.python.ops import rnn_cell_impl
 from tensorflow.python.util import nest
 
-from model.my_seq2seq import sequence_loss, sequence_loss_by_example
+#from model.my_seq2seq import sequence_loss, sequence_loss_by_example
 
 
 def position_encoding(sentence_size, embedding_size):
@@ -169,7 +169,7 @@ class Model_Mix(object):
         self.train_op = train_op
         self.saver = tf.train.Saver(tf.global_variables())
         # load machine code to English and English to Machine code map from data file
-        self._fb_map = my_graph.get_code_to_english('./useful_Map.txt')
+        # self._fb_map = my_graph.get_code_to_english('./useful_Map.txt')
 
     def rnn_encoder(self, q_emb):
         with tf.variable_scope('rnn_encoder'):
