@@ -33,7 +33,7 @@ tf.flags.DEFINE_integer("random_state", None, "Random state.")
 tf.flags.DEFINE_string("data_dir", "my_data/", "Directory containing bAbI tasks")
 tf.flags.DEFINE_string("checkpoint_path", "./checkpoints/", "Directory to save checkpoints")
 tf.flags.DEFINE_string("summary_path", "./summary/", "Directory to save summary")
-tf.flags.DEFINE_string("process_type", "train", "whether to load the checkpoint sor training new model")
+tf.flags.DEFINE_string("process_type", "test", "whether to load the checkpoint sor training new model")
 tf.flags.DEFINE_string("model_type", "seq2seq", "seq2seq or model or mix")
 
 FLAGS = tf.flags.FLAGS
@@ -189,7 +189,7 @@ def train_model(sess, model, vocab):
 
             print('-----------------------')
             print('Epoch', t)
-            print('valid epoches number', sign)
+           # print('valid epoches number', sign)
             print('Training loss:', train_pred_loss)
             print('Validation loss:', val_loss / sign)
             # show the sentence generate quality

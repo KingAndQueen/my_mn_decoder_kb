@@ -311,7 +311,7 @@ class Model_Mix(object):
         #     for hopn in range(self._hops):
         #         with tf.variable_scope('hop_{}'.format(hopn)):
         #             self.C.append(tf.Variable(C, name="C"))
-        self.rnn_embedding = variable_scope.get_variable("embedding", [self._vocab_size, self._rnn_neurons],
+        self.rnn_embedding = tf.get_variable("embedding", [self._vocab_size, self._rnn_neurons],
                                                          dtype=tf.float32)
 
     def _inference(self, stories, queries):
