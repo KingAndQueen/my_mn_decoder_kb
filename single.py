@@ -33,7 +33,7 @@ tf.flags.DEFINE_integer("random_state", None, "Random state.")
 tf.flags.DEFINE_string("data_dir", "my_data/", "Directory containing bAbI tasks")
 tf.flags.DEFINE_string("checkpoint_path", "./checkpoints/", "Directory to save checkpoints")
 tf.flags.DEFINE_string("summary_path", "./summary/", "Directory to save summary")
-tf.flags.DEFINE_string("process_type", "test", "whether to load the checkpoint sor training new model")
+tf.flags.DEFINE_string("process_type", "train", "whether to load the checkpoint sor training new model")
 tf.flags.DEFINE_string("model_type", "seq2seq", "seq2seq or model or mix")
 
 FLAGS = tf.flags.FLAGS
@@ -255,10 +255,10 @@ with tf.Session() as sess:
         print('Initial model with fresh parameters.')
         sess.run(tf.global_variables_initializer())
         train_model(sess, model, vocab)
-        del  model
-    if FLAGS.process_type =='test'or FLAGS.process_type=='train':
+        FLAGS.process_type = 'test'
+        test_model(model, vocab)
+    if FLAGS.process_type =='test':
         print('Initial model...')
-        FLAGS.process_type='test'
         model = Model_Mix(FLAGS, session=sess, vocab=vocab)
         print('Reading model parameters from checkpoints %s', FLAGS.checkpoint_path)
         ckpt = tf.train.get_checkpoint_state(FLAGS.checkpoint_path)
