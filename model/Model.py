@@ -107,9 +107,9 @@ class Model_Mix(object):
         self._name = FLAGS.model_type
         self._rnn_neurons = FLAGS.rnn_neurons
         self._num_layers = FLAGS.rnn_layers
-        self._build_inputs()
-        self._build_vars()
-        self._encoding = tf.constant(encoding(self._sentence_size, self._embedding_size), name="encoding")
+        self._build_inputs(FLAGS)
+        self._build_vars(FLAGS)
+        self._position_encoder = tf.constant(encoding(self._sentence_size, self._embedding_size), name="encoding")
         self.vocab = vocab
         self.additional_info_size = FLAGS.additional_info_memory_size
         self._lr=tf.Variable(float(FLAGS.learning_rate), trainable=False, dtype=tf.float32)
@@ -119,8 +119,7 @@ class Model_Mix(object):
         if FLAGS.model_type == 'memn2n' or FLAGS.model_type == 'mix':
             logits, logits_mem = self._inference(self._stories, self._queries)  # (batch_size, vocab_size)
             # count the logits of inference
-            fact_labels = tf.slice(self._answers, [0, 0, 0], [-1, 1, -1])
-            fact_labels = tf.squeeze(fact_labels)
+            fact_labels = self._ans_fact
             cross_entropy_facts = tf.nn.softmax_cross_entropy_with_logits(logits=logits,
                                                                           labels=tf.cast(fact_labels, tf.float32),
                                                                           name='fact_cross_entropy')
@@ -156,7 +155,6 @@ class Model_Mix(object):
 
         loss_op=tf.reduce_mean(loss_op, name="cross_entropy_sum")
         grads_and_vars = self._opt.compute_gradients(loss_op)
-        # pdb.set_trace()
         grads_and_vars = [(tf.clip_by_norm(g, self._max_grad_norm), v) for g, v in grads_and_vars]
         grads_and_vars = [(add_gradient_noise(g), v) for g, v in grads_and_vars]
 
@@ -287,31 +285,36 @@ class Model_Mix(object):
             outputs = tf.transpose(outputs, perm=[1, 0, 2])
             return outputs  # ,outputs_original
 
-    def _build_inputs(self):
+    def _build_inputs(self,FLAGS):
         self._stories = tf.placeholder(tf.int32, [self._batch_size, self._memory_size, self._sentence_size],
                                        name="stories")
         self._queries = tf.placeholder(tf.int32, [self._batch_size, self._sentence_size], name="queries")
-        self._answers = tf.placeholder(tf.int32, [self._batch_size, self._sentence_size + 1], name="answers")
-        self._weight = tf.placeholder(tf.float32, [self._batch_size, self._sentence_size], name='A_weight')
+        if FLAGS.model_type == 'memn2n':
+            self._ans_fact=tf.placeholder(tf.int32, [self._batch_size,self._vocab_size],name="ans_fact")
+        else:
+            self._answers = tf.placeholder(tf.int32, [self._batch_size, self._sentence_size + 1], name="answers")
+            self._weight = tf.placeholder(tf.float32, [self._batch_size, self._sentence_size], name='A_weight')
         # self._lr = tf.placeholder(tf.float32, [], name="learning_rate")
-        sign, answers_shifted = tf.split(self._answers, [1, -1], 1)
-        self._answers_shifted = answers_shifted
+            sign, answers_shifted = tf.split(self._answers, [1, -1], 1)
+            self._answers_shifted = answers_shifted
 
-    def _build_vars(self):
-        # with tf.variable_scope(self._name):
-        #     init = tf.random_normal_initializer(stddev=0.1)
-        #     A = init([self._vocab_size , self._embedding_size])
-        #     C = init([self._vocab_size , self._embedding_size])
-        #     #      self.reshape_to_rnn =self._init([int(self._rnn_neurons), self._embedding_size])
-        #
-        #     self.A_1 = tf.Variable(A, name="A")
-        #
-        #     self.C = []
-        #
-        #     for hopn in range(self._hops):
-        #         with tf.variable_scope('hop_{}'.format(hopn)):
-        #             self.C.append(tf.Variable(C, name="C"))
-        self.rnn_embedding = tf.get_variable("embedding", [self._vocab_size, self._rnn_neurons],
+    def _build_vars(self,FLAGS):
+        if FLAGS.model_type == 'memn2n':
+          with tf.variable_scope(self._name):
+            init = tf.random_normal_initializer(stddev=0.1)
+            A = init([self._vocab_size , self._embedding_size])
+            C = init([self._vocab_size , self._embedding_size])
+            #      self.reshape_to_rnn =self._init([int(self._rnn_neurons), self._embedding_size])
+
+            self.A_1 = tf.Variable(A, name="A")
+
+            self.C = []
+
+            for hopn in range(self._hops):
+                with tf.variable_scope('hop_{}'.format(hopn)):
+                    self.C.append(tf.Variable(C, name="C"))
+        else:
+            self.rnn_embedding = tf.get_variable("embedding", [self._vocab_size, self._rnn_neurons],
                                                          dtype=tf.float32)
 
     def _inference(self, stories, queries):
@@ -319,17 +322,17 @@ class Model_Mix(object):
             # Use A_1 for thee question embedding as per Adjacent Weight Sharing
             q_emb = tf.nn.embedding_lookup(self.A_1, queries)
             # pdb.set_trace()
-            u_0 = tf.reduce_sum(q_emb * self._encoding, 1)
+            u_0 = tf.reduce_sum(q_emb * self._position_encoder, 1)
             u = [u_0]
 
             for hopn in range(self._hops):
                 if hopn == 0:
                     m_emb_A = tf.nn.embedding_lookup(self.A_1, stories)
-                    m_A = tf.reduce_sum(m_emb_A * self._encoding, 2)
+                    m_A = tf.reduce_sum(m_emb_A * self._position_encoder, 2)
                 else:
                     with tf.variable_scope('hop_{}'.format(hopn - 1)):
                         m_emb_A = tf.nn.embedding_lookup(self.C[hopn - 1], stories)
-                        m_A = tf.reduce_sum(m_emb_A * self._encoding, 2)
+                        m_A = tf.reduce_sum(m_emb_A * self._position_encoder, 2)
 
                 # hack to get around no reduce_dot
                 u_temp = tf.transpose(tf.expand_dims(u[-1], -1), [0, 2, 1])
@@ -346,7 +349,7 @@ class Model_Mix(object):
                 probs_temp = tf.transpose(tf.expand_dims(probs, -1), [0, 2, 1])
                 with tf.variable_scope('hop_{}'.format(hopn)):
                     m_emb_C = tf.nn.embedding_lookup(self.C[hopn], stories)
-                m_C = tf.reduce_sum(m_emb_C * self._encoding, 2)
+                m_C = tf.reduce_sum(m_emb_C * self._position_encoder, 2)
 
                 c_temp = tf.transpose(m_C, [0, 2, 1])
                 o_k = tf.reduce_sum(c_temp * probs_temp, 2)
@@ -623,7 +626,7 @@ class Model_Mix(object):
             total_loss += loss
         return total_loss
 
-    def predict(self, stories, queries, answers, weight, process_type='train', lr=None, introspection=False):
+    def predict(self, stories, queries, answers=None, weight=None,fact=None, process_type='train', lr=None, introspection=False):
         """Predicts answers
         """
         if introspection:
@@ -645,9 +648,16 @@ class Model_Mix(object):
             feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
             return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict), self.vocab
         if process_type == 'train':
-            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
+            if fact is None:
+                feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers,
+                             self._weight: weight}
+            else:
+                feed_dict = {self._stories: stories, self._queries: queries,self._ans_fact:fact}
             return self._sess.run([self.loss_op, self.train_op, self.loss_summary], feed_dict=feed_dict)
         if process_type == 'valid':
-            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
+            if fact is None:
+                feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
+            else:
+                feed_dict = {self._stories: stories, self._queries: queries, self._ans_fact:fact}
             return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict)
         print('Error _______ :invalid process_type')

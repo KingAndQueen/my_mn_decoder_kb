@@ -27,30 +27,30 @@ tf.flags.DEFINE_integer("additional_info_memory_size", 6, "size of additional in
 tf.flags.DEFINE_integer("rnn_layers", 3, "the num layers of RNN.")
 tf.flags.DEFINE_integer("rnn_neurons", 1000, "the number of neurons in Seq2seq's one layer of RNN.")
 
-tf.flags.DEFINE_integer("task_id", 1, "bAbI task id, 1 <= id <= 20")
+tf.flags.DEFINE_integer("task_id", 2, "bAbI task id, 1 <= id <= 20")
 tf.flags.DEFINE_integer("random_state", None, "Random state.")
 # tf.flags.DEFINE_string("data_dir", "data/tasks_1-20_v1-2/en/", "Directory containing bAbI tasks")
 tf.flags.DEFINE_string("data_dir", "my_data/", "Directory containing bAbI tasks")
 tf.flags.DEFINE_string("checkpoint_path", "./checkpoints/", "Directory to save checkpoints")
 tf.flags.DEFINE_string("summary_path", "./summary/", "Directory to save summary")
 tf.flags.DEFINE_string("process_type", "train", "whether to load the checkpoint sor training new model")
-tf.flags.DEFINE_string("model_type", "seq2seq", "seq2seq or model or mix")
+tf.flags.DEFINE_string("model_type", "memn2n", "seq2seq or memn2n or mix")
 
 FLAGS = tf.flags.FLAGS
 
 print("Started Task:", FLAGS.task_id)
 
 # task data
-train = []
-test = []
-# train, test = load_task(FLAGS.data_dir, FLAGS.task_id)
+# train = []
+# test = []
+train, test = load_task(FLAGS.data_dir, FLAGS.task_id)
 # train_sqa_movie,test_sqa_movie=my_load_task_movies(FLAGS.data_dir,20)
 # train.extend(train_sqa_movie)
 # test.extend(test_sqa_movie)
 # train_sqa_tt, test_sqa_tt = my_load_task_tt(FLAGS.data_dir + 'ticktock_data_small', 20)
-train_sqa_friends, text_sqa_friends = my_load_friends(FLAGS.data_dir + 'friends', 20)
-train.extend(train_sqa_friends)
-test.extend(text_sqa_friends)
+# train_sqa_friends, text_sqa_friends = my_load_friends(FLAGS.data_dir + 'friends', 20)
+# train.extend(train_sqa_friends)
+# test.extend(text_sqa_friends)
 # pdb.set_trace()
 data = train + test
 # train,test=model_selection.train_test_split(data,test_size=0.2,random_state=FLAGS.random_state)
@@ -68,15 +68,17 @@ del data
 sentence_size = max(query_size, sentence_size, answer_size)  # for the position
 sentence_size += 1  # +1 for time words +1 for go +1 for eos
 
-memory_size = min(FLAGS.memory_size, max_story_size) + FLAGS.additional_info_memory_size
+memory_size = max(FLAGS.memory_size, max_story_size) + FLAGS.additional_info_memory_size
 vocab = Vocab()
 vocab.add_vocab(words)
-S, Q, A, A_fact, A_weight = vectorize_data(train, vocab, sentence_size, memory_size)
-# Add time words/indexes
 for i in range(memory_size):
     vocab.word_to_index('time{}'.format(i + 1))
+
+S, Q, A, A_fact, A_weight= vectorize_data(train, vocab, sentence_size, memory_size, fact=FLAGS.model_type)
+# Add time words/indexes
+
 additional_vocab_size = 50  # for additional infor from knowledge base
-vocab_size = vocab.vocab_size + additional_vocab_size  # +1 for nil word
+vocab_size = vocab.vocab_size #+ additional_vocab_size  # +1 for nil word
 
 # sentence_size= max(sentence_size,20) # set the same certain length for decoder
 print('Vocabulary size:', vocab_size)
@@ -90,11 +92,19 @@ FLAGS.vocab_size=vocab_size
 FLAGS.sentence_size=sentence_size
 FLAGS.memory_size=memory_size
 del train
-trainS, valS, trainQ, valQ, trainA, valA, trainA_fact, valA_fact, trainA_weight, valA_weight = model_selection.train_test_split(
-    S, Q, A, A_fact, A_weight, test_size=.2,
-    random_state=FLAGS.random_state)  # validate set size have to equal to one batch size
+if FLAGS.model_type=='memn2n':
+    trainS, valS, trainQ, valQ, trainA, valA, trainA_fact, valA_fact, trainA_weight, valA_weight = model_selection.train_test_split(
+        S, Q, A, A_fact, A_weight, test_size=.2,
+        random_state=FLAGS.random_state)  # validate set size have to equal to one batch size
+else:
+    trainS, valS, trainQ, valQ, trainA, valA, trainA_weight, valA_weight = model_selection.train_test_split(
+        S, Q, A, A_weight, test_size=.2,
+        random_state=FLAGS.random_state)
+    trainA_fact,valA_fact=[],[]
+
 del S, Q, A, A_fact, A_weight
-testS, testQ, testA, testA_fact, testA_weight = vectorize_data(test, vocab, sentence_size, memory_size)
+
+testS, testQ, testA, testA_fact, testA_weight = vectorize_data(test, vocab, sentence_size, memory_size,fact=FLAGS.model_type)
 del test
 
 print("Training set shape", trainS.shape)
@@ -146,7 +156,7 @@ def count_bleu(labels_sents, predicts, vocab):
 # config = tf.ConfigProto()
 # config.gpu_options.per_process_gpu_memory_fraction = 1.0
 
-def train_model(sess, model, vocab):
+def train_model(sess, model, vocab,):
     print('Training...')
     train_summary_writer = tf.summary.FileWriter(FLAGS.summary_path, sess.graph)
     for t in range(1, FLAGS.epochs + 1):
@@ -164,7 +174,11 @@ def train_model(sess, model, vocab):
             q = trainQ[start:end]
             a = trainA[start:end]
             a_w = trainA_weight[start:end]
-            train_pred_loss, _, summary = model.predict(s, q, a, a_w, process_type='train')
+            a_f=trainA_fact[start:end]
+            if FLAGS.model_type=='memn2n':
+                train_pred_loss, _, summary = model.predict(s, q,fact=a_f, process_type='train')
+            else:
+                train_pred_loss, _, summary = model.predict(s, q, answers=a, weight=a_w, process_type='train')
             previous_losses.append(train_pred_loss)
         if t % FLAGS.evaluation_interval == 0:
             # pdb.set_trace()
@@ -182,7 +196,11 @@ def train_model(sess, model, vocab):
                 q = valQ[start:end]
                 a = valA[start:end]
                 a_w = valA_weight[start:end]
-                val_pred_loss, val_pred_sent = model.predict(s, q, a, a_w, process_type='valid')
+                a_f = valA_fact[start:end]
+                if FLAGS.model_type == 'memn2n':
+                    val_pred_loss, val_pred_sent = model.predict(s, q,fact=a_f, process_type='valid')
+                else:
+                    val_pred_loss, val_pred_sent = model.predict(s, q, a,a_w, process_type='valid')
                 val_loss += val_pred_loss
                 val_pred_sents += list(val_pred_sent)
                 # pdb.set_trace()

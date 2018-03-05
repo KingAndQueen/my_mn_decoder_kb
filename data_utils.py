@@ -25,7 +25,9 @@ class Vocab():
                 self.word2idx[words] = index
                 self.idx2word[index] = words
     def word_to_index(self,word):
-        self.add_vocab(word)
+        if word not in self.word2idx:
+            print('add word',word)
+            self.add_vocab(word)
         return self.word2idx[word]
     def index_to_word(self,index):
         if index in self.idx2word:
@@ -162,7 +164,8 @@ def tokenize(sent):
     >>> tokenize('Bob dropped the apple. Where is the apple?')
     ['Bob', 'dropped', 'the', 'apple', '.', 'Where', 'is', 'the', 'apple', '?']
     '''
-    return sent.split()  # [x.strip() for x in re.split('(\W+)?', sent) if x.strip()]
+    # return sent.split()  #
+    return [x.strip() for x in re.split('(\W+)?', sent) if x.strip()]
 
 
 def parse_stories(lines, only_supporting=False):
@@ -218,7 +221,7 @@ def get_stories(f, only_supporting=False):
         return parse_stories(f.readlines(), only_supporting=only_supporting)
 
 
-def vectorize_data(data, vocab, sentence_size, memory_size):
+def vectorize_data(data, vocab, sentence_size, memory_size,fact='seq2seq'):
     """
     Vectorize stories and queries.
 
@@ -233,7 +236,7 @@ def vectorize_data(data, vocab, sentence_size, memory_size):
     S = []
     Q = []
     A = []
-    A_fact = []
+    A_facts = []
     A_weight = []
     for story, query, answer in data:
         ss = []
@@ -264,7 +267,16 @@ def vectorize_data(data, vocab, sentence_size, memory_size):
         for answer_ in answer:
             y.append(vocab.word_to_index(answer_))
             weight.append(1.0)
-        A_fact.append(copy.copy(y[0]))  # use the first word as fact in BAbI task
+
+        if fact=='memn2n':
+           
+            A_fact = np.zeros(vocab_size )  # 0 is reserved for nil word
+            for a in answer:
+                A_fact[vocab.word_to_index(a)] = 1
+            A_facts.append(A_fact)
+
+        # A_facts.append(copy.copy(y[0]))  # use the first word as fact in BAbI task
+
         y.append(vocab.word_to_index('<eos>'))
         weight.append(1.0)
         la = max(0, sentence_size+1 - len(y))
@@ -281,7 +293,7 @@ def vectorize_data(data, vocab, sentence_size, memory_size):
         A.append(y)
         A_weight.append(np.array(weight))
 
-    return np.array(S), np.array(Q), np.array(A), np.array(A_fact), np.array(A_weight)
+    return np.array(S), np.array(Q), np.array(A), np.array(A_facts), np.array(A_weight)
 
 
 #if __name__ == '__main__':
