@@ -107,6 +107,10 @@ del S, Q, A, A_fact, A_weight
 testS, testQ, testA, testA_fact, testA_weight = vectorize_data(test, vocab, sentence_size, memory_size,fact=FLAGS.model_type)
 del test
 
+train_labels = np.argmax(trainA_fact, axis=1)
+test_labels = np.argmax(testA_fact, axis=1)
+val_labels = np.argmax(valA_fact, axis=1)
+
 print("Training set shape", trainS.shape)
 
 # params
@@ -210,6 +214,8 @@ def train_model(sess, model, vocab,):
            # print('valid epoches number', sign)
             print('Training loss:', train_pred_loss)
             print('Validation loss:', val_loss / sign)
+            pdb.set_trace()
+            print('Validation Accuracy:',metrics.accuracy_score(np.array(val_pred_sents), train_labels))
             # show the sentence generate quality
             # perplex_train = math.exp(float(train_pred_loss) if train_pred_loss < 500 else float('inf'))
             # print('Training sentence perplex:', perplex_train)

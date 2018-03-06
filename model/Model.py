@@ -657,7 +657,8 @@ class Model_Mix(object):
         if process_type == 'valid':
             if fact is None:
                 feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
+                return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict)
             else:
                 feed_dict = {self._stories: stories, self._queries: queries, self._ans_fact:fact}
-            return self._sess.run([self.loss_op, self.predict_key_fact], feed_dict=feed_dict)
+                return self._sess.run([self.loss_op, self.predict_key_fact], feed_dict=feed_dict)
         print('Error _______ :invalid process_type')
