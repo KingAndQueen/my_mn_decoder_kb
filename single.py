@@ -53,7 +53,7 @@ train, test = load_task(FLAGS.data_dir, FLAGS.task_id)
 # test.extend(text_sqa_friends)
 # pdb.set_trace()
 data = train + test
-train,test=model_selection.train_test_split(data,test_size=0.2,random_state=FLAGS.random_state)
+# train,test=model_selection.train_test_split(data,test_size=0.2,random_state=FLAGS.random_state)
 words = sorted(reduce(lambda x, y: x | y, (set(list(chain.from_iterable(s)) + q + a) for s, q, a in data)))
 
 # word_idx = dict((c, i + 1) for i, c in enumerate(vocab))
@@ -68,7 +68,7 @@ del data
 sentence_size = max(query_size, sentence_size, answer_size)  # for the position
 sentence_size += 1  # +1 for time words +1 for go +1 for eos
 
-memory_size = max(FLAGS.memory_size, max_story_size) + FLAGS.additional_info_memory_size
+memory_size = min(FLAGS.memory_size, max_story_size) #+ FLAGS.additional_info_memory_size
 vocab = Vocab()
 vocab.add_vocab(words)
 for i in range(memory_size):

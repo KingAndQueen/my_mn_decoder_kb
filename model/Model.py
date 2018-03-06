@@ -358,6 +358,7 @@ class Model_Mix(object):
                 # u_k = tf.matmul(u[-1], self.H) + o_k
 
                 u_k = u[-1] + o_k
+
                 u.append(u_k)
 
             # Use last C for output (transposed)
