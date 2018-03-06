@@ -53,7 +53,7 @@ train, test = load_task(FLAGS.data_dir, FLAGS.task_id)
 # test.extend(text_sqa_friends)
 # pdb.set_trace()
 data = train + test
-# train,test=model_selection.train_test_split(data,test_size=0.2,random_state=FLAGS.random_state)
+train,test=model_selection.train_test_split(data,test_size=0.2,random_state=FLAGS.random_state)
 words = sorted(reduce(lambda x, y: x | y, (set(list(chain.from_iterable(s)) + q + a) for s, q, a in data)))
 
 # word_idx = dict((c, i + 1) for i, c in enumerate(vocab))
@@ -215,7 +215,7 @@ def train_model(sess, model, vocab,):
             print('Training loss:', train_pred_loss)
             print('Validation loss:', val_loss / sign)
             pdb.set_trace()
-            print('Validation Accuracy:',metrics.accuracy_score(np.array(val_pred_sents), train_labels))
+            print('Validation Accuracy:',metrics.accuracy_score(np.array(val_pred_sents), val_labels[:len(val_pred_sents)]))
             # show the sentence generate quality
             # perplex_train = math.exp(float(train_pred_loss) if train_pred_loss < 500 else float('inf'))
             # print('Training sentence perplex:', perplex_train)
