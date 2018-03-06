@@ -645,8 +645,13 @@ class Model_Mix(object):
             #		pdb.set_trace()
             #		stories=new_stories
             self.type = 'test'
-            feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
-            return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict), self.vocab
+            if fact is None:
+                feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers, self._weight: weight}
+                return self._sess.run([self.loss_op, self.predict_op], feed_dict=feed_dict), self.vocab
+            else:
+                feed_dict = {self._stories: stories, self._queries: queries, self._ans_fact:fact}
+                return self._sess.run([self.loss_op, self.predict_key_fact], feed_dict=feed_dict), self.vocab
+
         if process_type == 'train':
             if fact is None:
                 feed_dict = {self._stories: stories, self._queries: queries, self._answers: answers,
