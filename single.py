@@ -214,7 +214,6 @@ def train_model(sess, model, vocab,):
            # print('valid epoches number', sign)
             print('Training loss:', train_pred_loss)
             print('Validation loss:', val_loss / sign)
-            pdb.set_trace()
             print('Validation Accuracy:',metrics.accuracy_score(np.array(val_pred_sents), val_labels[:len(val_pred_sents)]))
             # show the sentence generate quality
             # perplex_train = math.exp(float(train_pred_loss) if train_pred_loss < 500 else float('inf'))
