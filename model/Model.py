@@ -114,7 +114,8 @@ class Model_Mix(object):
         self.additional_info_size = FLAGS.additional_info_memory_size
         self._lr=tf.Variable(float(FLAGS.learning_rate), trainable=False, dtype=tf.float32)
         self.learning_rate_decay_op = tf.assign(self._lr,self._lr * FLAGS.learning_rate_decay_factor)
-        self._opt = tf.train.GradientDescentOptimizer(learning_rate=self._lr)
+        # self._opt = tf.train.GradientDescentOptimizer(learning_rate=self._lr)
+        self._opt = tf.train.AdamOptimizer(learning_rate=self._lr)
         # logits_mem = None
         if FLAGS.model_type == 'memn2n' or FLAGS.model_type == 'mix':
             logits, logits_mem = self._inference(self._stories, self._queries)  # (batch_size, vocab_size)
