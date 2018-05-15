@@ -34,23 +34,23 @@ tf.flags.DEFINE_string("data_dir", "my_data/", "Directory containing bAbI tasks"
 tf.flags.DEFINE_string("checkpoint_path", "./checkpoints/", "Directory to save checkpoints")
 tf.flags.DEFINE_string("summary_path", "./summary/", "Directory to save summary")
 tf.flags.DEFINE_string("process_type", "train", "whether to load the checkpoint sor training new model")
-tf.flags.DEFINE_string("model_type", "memn2n", "seq2seq or memn2n or mix")
+tf.flags.DEFINE_string("model_type", "seq2seq", "seq2seq or memn2n or mix")
 
 FLAGS = tf.flags.FLAGS
 
 print("Started Task:", FLAGS.task_id)
 
 # task data
-# train = []
-# test = []
-train, test = load_task(FLAGS.data_dir, FLAGS.task_id)
+train = []
+test = []
+# train, test = load_task(FLAGS.data_dir, FLAGS.task_id)
 # train_sqa_movie,test_sqa_movie=my_load_task_movies(FLAGS.data_dir,20)
 # train.extend(train_sqa_movie)
 # test.extend(test_sqa_movie)
 # train_sqa_tt, test_sqa_tt = my_load_task_tt(FLAGS.data_dir + 'ticktock_data_small', 20)
-# train_sqa_friends, text_sqa_friends = my_load_friends(FLAGS.data_dir + 'friends', 20)
-# train.extend(train_sqa_friends)
-# test.extend(text_sqa_friends)
+train_sqa_friends, text_sqa_friends = my_load_friends(FLAGS.data_dir + 'friends', 20)
+train.extend(train_sqa_friends)
+test.extend(text_sqa_friends)
 # pdb.set_trace()
 data = train + test
 # train,test=model_selection.train_test_split(data,test_size=0.2,random_state=FLAGS.random_state)
@@ -71,8 +71,8 @@ sentence_size += 1  # +1 for time words +1 for go +1 for eos
 memory_size = min(FLAGS.memory_size, max_story_size) #+ FLAGS.additional_info_memory_size
 vocab = Vocab()
 vocab.add_vocab(words)
-for i in range(memory_size):
-    vocab.word_to_index('time{}'.format(i + 1))
+# for i in range(memory_size):
+#     vocab.word_to_index('time{}'.format(i + 1))
 
 S, Q, A, A_fact, A_weight= vectorize_data(train, vocab, sentence_size, memory_size, fact=FLAGS.model_type)
 # Add time words/indexes
@@ -106,10 +106,10 @@ del S, Q, A, A_fact, A_weight
 
 testS, testQ, testA, testA_fact, testA_weight = vectorize_data(test, vocab, sentence_size, memory_size,fact=FLAGS.model_type)
 del test
-
-train_labels = np.argmax(trainA_fact, axis=1)
-test_labels = np.argmax(testA_fact, axis=1)
-val_labels = np.argmax(valA_fact, axis=1)
+if FLAGS.model_type=='memn2n':
+    train_labels = np.argmax(trainA_fact, axis=1)
+    test_labels = np.argmax(testA_fact, axis=1)
+    val_labels = np.argmax(valA_fact, axis=1)
 
 print("Training set shape", trainS.shape)
 
@@ -214,12 +214,12 @@ def train_model(sess, model, vocab,):
            # print('valid epoches number', sign)
             print('Training loss:', train_pred_loss)
             print('Validation loss:', val_loss / sign)
-            print('Validation Accuracy:',metrics.accuracy_score(np.array(val_pred_sents), val_labels[:len(val_pred_sents)]))
+            # print('Validation Accuracy:',metrics.accuracy_score(np.array(val_pred_sents), val_labels[:len(val_pred_sents)]))
             # show the sentence generate quality
-            # perplex_train = math.exp(float(train_pred_loss) if train_pred_loss < 500 else float('inf'))
-            # print('Training sentence perplex:', perplex_train)
-            # perplex_val = math.exp(float(val_loss/sign)) if val_loss/sign < 500 else float('inf')
-            # print('Validation sentence perplex:', perplex_val)
+            perplex_train = math.exp(float(train_pred_loss) if train_pred_loss < 500 else float('inf'))
+            print('Training sentence perplex:', perplex_train)
+            perplex_val = math.exp(float(val_loss/sign)) if val_loss/sign < 500 else float('inf')
+            print('Validation sentence perplex:', perplex_val)
             # pdb.set_trace()
             # train_preds_sents_words = np.argmax(train_pred_sents, 2)
             #            train_acc = metrics.accuracy_score(train_preds_sents_words[:,0], train_labels[:len(train_preds_sents_words)])
