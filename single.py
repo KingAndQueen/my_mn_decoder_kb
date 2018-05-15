@@ -12,20 +12,20 @@ import pdb
 import math
 import nltk
 
-tf.flags.DEFINE_float("learning_rate", 0.01, "Learning rate for SGD.")
+tf.flags.DEFINE_float("learning_rate", 0.0001, "Learning rate for SGD.")
 tf.flags.DEFINE_float("anneal_rate", 25, "Number of epochs between halving the learnign rate.")
 tf.flags.DEFINE_float("anneal_stop_epoch", 100, "Epoch number to end annealed lr schedule.")
 tf.flags.DEFINE_float("learning_rate_decay_factor", 1, 'if loss not decrease, multiple the lr with factor')
-tf.flags.DEFINE_float("max_grad_norm", 40.0, "Clip gradients to this norm.")
-tf.flags.DEFINE_integer("evaluation_interval", 10, "Evaluate and print results every x epochs")
-tf.flags.DEFINE_integer("batch_size", 32, "Batch size for training.")  # should consider the size of validation set
+tf.flags.DEFINE_float("max_grad_norm", 5.0, "Clip gradients to this norm.")
+tf.flags.DEFINE_integer("evaluation_interval", 20, "Evaluate and print results every x epochs")
+tf.flags.DEFINE_integer("batch_size", 128, "Batch size for training.")  # should consider the size of validation set
 tf.flags.DEFINE_integer("hops", 3, "Number of hops in the Memory Network.")
-tf.flags.DEFINE_integer("epochs", 100, "Number of epochs to train for.")
+tf.flags.DEFINE_integer("epochs", 500, "Number of epochs to train for.")
 tf.flags.DEFINE_integer("embedding_size", 20, "Embedding size for MemE2E embedding matrices.")
 tf.flags.DEFINE_integer("memory_size", 50, "Maximum size of memory.")
 tf.flags.DEFINE_integer("additional_info_memory_size", 6, "size of additional info from KB . at least above 6")
 tf.flags.DEFINE_integer("rnn_layers", 3, "the num layers of RNN.")
-tf.flags.DEFINE_integer("rnn_neurons", 50, "the number of neurons in Seq2seq's one layer of RNN.")
+tf.flags.DEFINE_integer("rnn_neurons", 100, "the number of neurons in Seq2seq's one layer of RNN.")
 
 tf.flags.DEFINE_integer("task_id", 2, "bAbI task id, 1 <= id <= 20")
 tf.flags.DEFINE_integer("random_state", None, "Random state.")
@@ -38,7 +38,7 @@ tf.flags.DEFINE_string("model_type", "seq2seq", "seq2seq or memn2n or mix")
 
 FLAGS = tf.flags.FLAGS
 
-print("Started Task:", FLAGS.task_id)
+# print("Started Task:", FLAGS.task_id)
 
 # task data
 train = []
