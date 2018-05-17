@@ -137,8 +137,8 @@ class Model_Mix(object):
             a_emb = [embedding_ops.embedding_lookup(self.rnn_embedding, ans) for ans in answers]
             a_emb = a_emb[:self._sentence_size]
             if FLAGS.model_type == 'seq2seq': logits_mem = None
-            encoder_state, attention_state = self.rnn_encoder(q_emb)
-            rnn_outputs = self.rnn_decoder(encoder_state, attention_state, a_emb, logits_MemKG=logits_mem)
+            encoder_output, encoder_state = self.rnn_encoder(q_emb)
+            rnn_outputs = self.rnn_decoder(encoder_state, encoder_output, a_emb, logits_MemKG=logits_mem)
             # cross entropy
             predict_proba_op = tf.nn.softmax(rnn_outputs, name="predict_proba_op")
             self.predict_op = predict_proba_op
